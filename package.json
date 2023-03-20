@@ -1,0 +1,17 @@
+{
+  "name": "cn.com.zerogame.unitypackages.entities.physics",
+  "displayName": "ZGUP Entities Physics",
+  "version": "2.2.1",
+  "unity": "2022.2",
+  "unityRelease": "0f1",
+  "dependencies": {
+	  "com.unity.physics": "0.6.0-preview.3", 
+	  "cn.com.zerogame.unitypackages.entities": "2.2.1"
+  },
+  "description": "Zero Game Unity Package Entites Physics",
+  "keywords": [
+    "zg", 
+	"dots", 
+	"physics"
+  ]
+}

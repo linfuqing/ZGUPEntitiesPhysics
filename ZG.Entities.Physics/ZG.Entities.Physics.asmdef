@@ -1,0 +1,35 @@
+{
+    "name": "ZG.Entities.Physics",
+    "rootNamespace": "",
+    "references": [
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Collections",
+        "Unity.Burst",
+        "Unity.Jobs",
+        "Unity.Mathematics",
+        "Unity.Transforms",
+        "Unity.Physics",
+        "Unity.Physics.Hybrid",
+        "Havok.Physics",
+        "ZG",
+        "ZG.Collections",
+        "ZG.Mathematics",
+        "ZG.Entities"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.entities",
+            "expression": "0.18.0-preview",
+            "define": "BURST_SYSTEM_JOB"
+        }
+    ],
+    "noEngineReferences": false
+}
