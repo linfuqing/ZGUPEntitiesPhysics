@@ -35,6 +35,8 @@ namespace ZG
             }
         }
 
+        public CompoundCollider.ColliderBlobInstance mainCollider => __colliders[0];
+
         public float3 position
         {
             get

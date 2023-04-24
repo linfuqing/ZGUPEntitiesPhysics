@@ -39,6 +39,8 @@ namespace ZG
         private BlobAssetReference<Unity.Physics.Collider>[] __colliders;
         private BlobAssetReference<PhysicsHierarchyDefinition> __definition;
 
+        public IReadOnlyList<BlobAssetReference<Unity.Physics.Collider>> colliders => __colliders;
+
         public BlobAssetReference<PhysicsHierarchyDefinition> definition
         {
             get

@@ -1043,6 +1043,8 @@ namespace ZG
             }
         }
 
+        public CompoundCollider.ColliderBlobInstance mainCollider => colliders[0];
+
         public
 #if UNITY_EDITOR
             new

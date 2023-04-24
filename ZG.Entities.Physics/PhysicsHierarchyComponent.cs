@@ -44,6 +44,20 @@ namespace ZG
                 this.AddComponent<PhysicsExclude>();
         }*/
 
+        public CompoundCollider.ColliderBlobInstance mainCollider
+        {
+            get
+            {
+                ref var collider = ref _database.definition.Value.shapes[0].colliders[0];
+
+                CompoundCollider.ColliderBlobInstance result;
+                result.Collider = _database.colliders[collider.index];
+                result.CompoundFromChild = collider.transform;
+
+                return result;
+            }
+        }
+
         void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
             var transform = gameObjectEntity.transform;

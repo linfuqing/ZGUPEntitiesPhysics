@@ -11,6 +11,8 @@ namespace ZG
 
         GameObjectEntity gameObjectEntity { get; }
 
+        CompoundCollider.ColliderBlobInstance mainCollider { get; }
+
         //void Refresh();
     }
 
