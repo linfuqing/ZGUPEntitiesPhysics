@@ -643,11 +643,11 @@ namespace ZG
         private EntityQuery __groupToEnable;
         private SingletonAssetContainer<BlobAssetReference<Collider>> __colliders;
         private SharedHashMap<int, BlobAssetReference<PhysicsHierarchyPrefab>> __prefabs;
-        private NativeHashMapLite<Key, int> __triggerEntityOffsets;
-        private NativeMultiHashMapLite<Key, Entity> __triggerEntitiesToCreate;
-        private NativeListLite<Entity> __triggerEntitiesToDestroy;
-        private NativeArrayLite<int> __triggerCount;
-        private NativeListLite<Value> __values;
+        private NativeParallelHashMap<Key, int> __triggerEntityOffsets;
+        private NativeParallelMultiHashMap<Key, Entity> __triggerEntitiesToCreate;
+        private NativeList<Entity> __triggerEntitiesToDestroy;
+        private NativeArray<int> __triggerCount;
+        private NativeList<Value> __values;
 
 #if ENABLE_PROFILER
         private ProfilerMarker __init;
@@ -695,11 +695,11 @@ namespace ZG
 
             __prefabs = state.World.GetOrCreateSystemUnmanaged<PhysicsHierarchyTriggerFactroySystem>().prefabs;
 
-            __triggerCount = new NativeArrayLite<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-            __triggerEntitiesToCreate = new NativeMultiHashMapLite<Key, Entity>(1, Allocator.Persistent);
-            __triggerEntityOffsets = new NativeHashMapLite<Key, int>(1, Allocator.Persistent);
-            __triggerEntitiesToDestroy = new NativeListLite<Entity>(Allocator.Persistent);
-            __values = new NativeListLite<Value>(Allocator.Persistent);
+            __triggerCount = new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+            __triggerEntitiesToCreate = new NativeParallelMultiHashMap<Key, Entity>(1, Allocator.Persistent);
+            __triggerEntityOffsets = new NativeParallelHashMap<Key, int>(1, Allocator.Persistent);
+            __triggerEntitiesToDestroy = new NativeList<Entity>(Allocator.Persistent);
+            __values = new NativeList<Value>(Allocator.Persistent);
 
 
 #if ENABLE_PROFILER

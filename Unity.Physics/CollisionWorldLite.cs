@@ -230,9 +230,9 @@ namespace ZG
         [NoAlias]
         private BroadphaseLite __broadphase;             // bounding volume hierarchies around subsets of the rigid bodies
         [NoAlias] 
-        private NativeArrayLite<RigidBody> __rigidbodies;    // storage for all the rigid bodies
+        private NativeArray<RigidBody> __rigidbodies;    // storage for all the rigid bodies
         [NoAlias] 
-        private NativeHashMapLite<Entity, int> __entityBodyIndexMap;
+        private NativeParallelHashMap<Entity, int> __entityBodyIndexMap;
 
         public int rigidbodyCount => __broadphase.staticTree.bodyCount + __broadphase.dynamicTree.bodyCount;
 
@@ -253,6 +253,8 @@ namespace ZG
         // Contacts are always created between rigid bodies if they are closer than this distance threshold.
         public float collisionTolerance => 0.1f; // todo - make this configurable?
 
+        public readonly Allocator Allocator;
+
         // Construct a collision world with the given number of uninitialized rigid bodies
         public CollisionWorldLite(int numStaticBodies, int numDynamicBodies, Allocator allocator)
         {
@@ -260,7 +262,9 @@ namespace ZG
 
             __rigidbodies = new NativeArrayLite<RigidBody>(numStaticBodies + numDynamicBodies, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             __broadphase = new BroadphaseLite(numStaticBodies, numDynamicBodies, allocator);
-            __entityBodyIndexMap = new NativeHashMapLite<Entity, int>(__rigidbodies.Length, Allocator.Persistent);
+            __entityBodyIndexMap = new NativeParallelHashMap<Entity, int>(__rigidbodies.Length, Allocator.Persistent);
+
+            Allocator = allocator;
         }
 
         public void Reset(int numStaticBodies, int numDynamicBodies)
@@ -268,7 +272,7 @@ namespace ZG
             int numRigidbodies = numStaticBodies + numDynamicBodies;
             if (__rigidbodies.Length < numRigidbodies)
             {
-                Allocator allocator = __rigidbodies.allocator;
+                Allocator allocator = Allocator;
 
                 __rigidbodies.Dispose();
 
@@ -284,12 +288,12 @@ namespace ZG
         // Free internal memory
         public void Dispose()
         {
-            if (__rigidbodies.isCreated)
+            if (__rigidbodies.IsCreated)
                 __rigidbodies.Dispose();
 
             __broadphase.Dispose();
 
-            if (__entityBodyIndexMap.isCreated)
+            if (__entityBodyIndexMap.IsCreated)
                 __entityBodyIndexMap.Dispose();
         }
 
@@ -337,7 +341,7 @@ namespace ZG
             in JobHandle inputDeps, 
             ref SystemState systemState)
         {
-            var entityBodyIndexMap = ((NativeParallelHashMap<Entity, int>)__entityBodyIndexMap).AsParallelWriter();
+            var entityBodyIndexMap = __entityBodyIndexMap.AsParallelWriter();
             var rigidbodies = this.rigidbodies;
             int rigidbodyCount = this.rigidbodyCount;
 
