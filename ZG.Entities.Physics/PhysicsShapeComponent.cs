@@ -1159,7 +1159,10 @@ namespace ZG
 
             __DestroyColliders();
 
-            gameObjectEntity.onCreated += __OnCreated;
+            __system = world.GetExistingSystemManaged<System>();
+            __system.MaskRebuild(root);
+
+            //gameObjectEntity.onCreated += __OnCreated;
 
             //onDispose += __OnDispose;
         }
@@ -1170,7 +1173,7 @@ namespace ZG
                 __colliderBlobInstances.Dispose();
         }*/
 
-        protected void OnRefresh()
+        /*protected void OnRefresh()
         {
             var gameObjectEntity = this.gameObjectEntity;
             Transform transform = gameObjectEntity == null ? null : gameObjectEntity.transform;
@@ -1182,7 +1185,7 @@ namespace ZG
             Rotation rotation;
             rotation.Value = transform.rotation;
             this.SetComponentData(rotation);
-        }
+        }*/
 
         protected void OnEnable()
         {
@@ -1596,11 +1599,11 @@ namespace ZG
             UnityEngine.Profiling.Profiler.EndSample();
         }
 
-        private void __OnCreated()
+        /*private void __OnCreated()
         {
             __system = world.GetExistingSystemManaged<System>();
             __system.MaskRebuild(root);
-        }
+        }*/
 
         void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
