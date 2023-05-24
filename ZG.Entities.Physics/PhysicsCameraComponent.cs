@@ -35,22 +35,6 @@ namespace ZG
             }
         }
 
-        public
-#if UNITY_EDITOR
-            new
-#endif
-            Camera camera
-        {
-            get => _camera;
-
-            set
-            {
-                _camera = value;
-
-                __UpdateCollider();
-            }
-        }
-
         public static float CalaculeHorizontalFieldOfView(float vFOVRad, float aspect)
         {
             return Mathf.Atan(Mathf.Tan(vFOVRad * 0.5f) * aspect) * 2.0f;
@@ -66,6 +50,27 @@ namespace ZG
             float radius = near / Mathf.Cos(fov * 0.5f);
 
             return radius;
+        }
+
+        public unsafe void CreateOrUpdateCollider(float nearClipPlane, float fieldOfView, float aspect)
+        {
+            SphereGeometry geometry = default;
+            geometry.Center = Vector3.zero;
+            geometry.Radius = __CalaculeRadius(nearClipPlane, fieldOfView, aspect);
+
+            if (!__collider.IsCreated)
+            {
+                CollisionFilter filter = default;
+                filter.BelongsTo = ~0u;
+                filter.CollidesWith = (uint)(int)_layerMask;
+                __collider = SphereCollider.Create(geometry, filter);
+
+                PhysicsCameraCollider collider;
+                collider.value = __collider;
+                this.SetComponentData(collider);
+            }
+            else
+                ((SphereCollider*)__collider.GetUnsafePtr())->Geometry = geometry;
         }
 
         protected void OnDestroy()
@@ -87,39 +92,6 @@ namespace ZG
             }
         }
 
-        private SphereGeometry __GetGeometry()
-        {
-            if (_camera == null)
-                _camera = GetComponent<Camera>();
-
-            SphereGeometry geometry = default;
-            geometry.Center = Vector3.zero;
-            geometry.Radius = __CalaculeRadius(_camera.nearClipPlane, _camera.fieldOfView, _camera.aspect);
-
-            return geometry;
-        }
-
-        private unsafe BlobAssetReference<Unity.Physics.Collider> __CreateOrGetCollider()
-        {
-            if (!__collider.IsCreated)
-            {
-                CollisionFilter filter = default;
-                filter.BelongsTo = ~0u;
-                filter.CollidesWith = (uint)(int)_layerMask;
-                __collider = SphereCollider.Create(__GetGeometry(), filter);
-            }
-
-            return __collider;
-        }
-
-        private unsafe void __UpdateCollider()
-        {
-            if (!__collider.IsCreated)
-                return;
-
-            ((SphereCollider*)__collider.GetUnsafePtr())->Geometry = __GetGeometry();
-        }
-
         void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
             Translation translation;
@@ -127,7 +99,7 @@ namespace ZG
             assigner.SetComponentData(entity, translation);
 
             PhysicsCameraCollider collider;
-            collider.value = __CreateOrGetCollider();
+            collider.value = BlobAssetReference<Unity.Physics.Collider>.Null;//  __CreateOrGetCollider();
             assigner.SetComponentData(entity, collider);
         }
     }
