@@ -13,6 +13,7 @@ namespace ZG
     {
         public enum ColliderType
         {
+            None, 
             Convex, 
             Compound
         }
@@ -132,7 +133,6 @@ namespace ZG
                         }
                     }
 
-                    source.hash = hash;
                     if (compoundCollider.value.IsCreated)
                         source.colliderType = PhysicsHierarchyCollidersBitField.ColliderType.Compound;
                     else
@@ -140,9 +140,12 @@ namespace ZG
                         if (source.colliderType == PhysicsHierarchyCollidersBitField.ColliderType.Compound)
                         {
                             PhysicsShapeDestroiedCollider destroiedCollider;
-                            destroiedCollider.hash = source.hash;
                             destroiedCollider.value = compoundColliders[index].value;
-                            destroiedColliders.Add(destroiedCollider);
+                            if (destroiedCollider.value.IsCreated)
+                            {
+                                destroiedCollider.hash = source.hash;
+                                destroiedColliders.Add(destroiedCollider);
+                            }
                         }
 
                         NativeArray<CompoundCollider.ColliderBlobInstance> colliderBlobInstances;
@@ -209,7 +212,7 @@ namespace ZG
                             switch (colliderBlobInstances.Length)
                             {
                                 case 0:
-                                    source.colliderType = PhysicsHierarchyCollidersBitField.ColliderType.Convex;
+                                    source.colliderType = PhysicsHierarchyCollidersBitField.ColliderType.None;
 
                                     compoundCollider.value = BlobAssetReference<Collider>.Null;
                                     break;
@@ -238,7 +241,11 @@ namespace ZG
                             colliderBlobInstances.Dispose();
                         }
                         else
+                        {
+                            source.colliderType = PhysicsHierarchyCollidersBitField.ColliderType.None;
+
                             compoundCollider.value = BlobAssetReference<Collider>.Null;
+                        }
                     }
 
                     compoundColliders[index] = compoundCollider;
@@ -249,6 +256,8 @@ namespace ZG
                         collider.Value = compoundCollider.value;
                         results[index] = collider;
                     }
+
+                    source.hash = hash;
                 }
 
                 source.value = destination;
