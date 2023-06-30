@@ -1,5 +1,4 @@
 using System;
-using Unity.Assertions;
 using Unity.Jobs;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -10,6 +9,9 @@ using Unity.Transforms;
 using Unity.Mathematics;
 using Unity.Physics;
 using Math = Unity.Physics.Math;
+using ZG;
+
+[assembly: RegisterGenericJobType(typeof(CopyHashMapJob<Entity, int>))]
 
 namespace ZG
 {
