@@ -17,11 +17,12 @@ namespace ZG.Entities.Physics
         public BlobAssetReference<Unity.Physics.Collider> value;
     }
 
-    public partial class PhysicsRaycastSystem : LookupSystem
+    [BurstCompile]
+    public partial struct PhysicsRaycastSystem : ISystem
     {
         private struct Raycast
         {
-            public NativeList<PhysicsRaycaster.Collider> collidersToIgnore;
+            public SharedList<PhysicsRaycaster.Collider>.Writer collidersToIgnore;
 
             [ReadOnly]
             public NativeArray<Entity> entityArray;
@@ -42,9 +43,10 @@ namespace ZG.Entities.Physics
                 if (raycastedCollider.value.IsCreated)
                 {
                     collider.value = (Unity.Physics.Collider*)raycastedCollider.value.GetUnsafePtr();
-                    int ignoreIndex = collidersToIgnore.IndexOf(collider);
-                    if (ignoreIndex != -1)
-                        collidersToIgnore.RemoveAt(ignoreIndex);
+                    int colliderIndex = collidersToIgnore.IndexOf(collider);
+
+                    if(colliderIndex != -1)
+                        collidersToIgnore.RemoveAt(colliderIndex);
                 }
 
                 if (compoundCollider.IsCreated)
@@ -62,7 +64,9 @@ namespace ZG.Entities.Physics
         [BurstCompile]
         private struct RaycastEx : IJobChunk
         {
-            public NativeList<PhysicsRaycaster.Collider> collidersToIgnore;
+            public uint lastSystemVersion;
+
+            public SharedList<PhysicsRaycaster.Collider>.Writer collidersToIgnore;
 
             [ReadOnly]
             public EntityTypeHandle entityType;
@@ -72,6 +76,9 @@ namespace ZG.Entities.Physics
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                if (chunk.Has(ref compoundColliderType) && !chunk.DidChange(ref compoundColliderType, lastSystemVersion))
+                    return;
+
                 Raycast raycast;
                 raycast.collidersToIgnore = collidersToIgnore;
                 raycast.entityArray = chunk.GetNativeArray(entityType);
@@ -84,74 +91,95 @@ namespace ZG.Entities.Physics
             }
         }
 
-        private EntityQuery __groupToInit;
-        private EntityQuery __groupToDestroy;
+        private EntityQuery __group;
 
-        private EndFrameEntityCommandSystem __endFrameBarrier;
+        private EntityTypeHandle __entityType;
 
-        public NativeList<PhysicsRaycaster.Collider> collidersToIgnore
+        private ComponentTypeHandle<PhysicsShapeCompoundCollider> __compoundColliderType;
+        private ComponentTypeHandle<PhysicsRaycastCollider> __raycastColliderType;
+
+        public SharedList<PhysicsRaycaster.Collider> collidersToIgnore
         {
             get;
 
             private set;
         }
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
         {
-            base.OnCreate();
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __group = builder
+                    .WithAllRW<PhysicsRaycastCollider>()
+                    .WithAll<PhysicsShapeCompoundCollider>()
+                    .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                    .AddAdditionalQuery()
+                    .WithAllRW<PhysicsRaycastCollider>()
+                    .WithNone<PhysicsShapeCompoundCollider>()
+                    .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                    .Build(ref state);
 
-            __groupToInit = GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsRaycastCollider>(),
-                        ComponentType.ReadOnly<PhysicsShapeCompoundCollider>()
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
+            //__group.SetChangedVersionFilter(ComponentType.ReadOnly<PhysicsShapeCompoundCollider>());
 
-            __groupToInit.SetChangedVersionFilter(typeof(PhysicsShapeCompoundCollider));
+            __entityType = state.GetEntityTypeHandle();
+            __compoundColliderType = state.GetComponentTypeHandle<PhysicsShapeCompoundCollider>(true);
+            __raycastColliderType = state.GetComponentTypeHandle<PhysicsRaycastCollider>();
 
-            __groupToDestroy = GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsRaycastCollider>()
-                    },
-                    None = new ComponentType[]
-                    {
-                        typeof(PhysicsShapeCompoundCollider)
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
-
-            __endFrameBarrier = World.GetOrCreateSystemManaged<EndFrameEntityCommandSystem>();
-
-            collidersToIgnore = new NativeList<PhysicsRaycaster.Collider>(Allocator.Persistent);
+            collidersToIgnore = new SharedList<PhysicsRaycaster.Collider>(Allocator.Persistent);
         }
 
-        protected override void OnDestroy()
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
         {
             collidersToIgnore.Dispose();
-
-            base.OnDestroy();
         }
 
-        protected override void _Update()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
             RaycastEx raycast;
-            raycast.collidersToIgnore = collidersToIgnore;
-            raycast.entityType = GetEntityTypeHandle();
-            raycast.compoundColliderType = GetComponentTypeHandle<PhysicsShapeCompoundCollider>(true);
-            raycast.raycastColliderType = GetComponentTypeHandle<PhysicsRaycastCollider>();
+            raycast.lastSystemVersion = state.LastSystemVersion;
+            raycast.collidersToIgnore = collidersToIgnore.writer;
+            raycast.entityType = __entityType.UpdateAsRef(ref state);
+            raycast.compoundColliderType = __compoundColliderType.UpdateAsRef(ref state);
+            raycast.raycastColliderType = __raycastColliderType.UpdateAsRef(ref state);
 
-            var jobHandle = raycast.Schedule(__groupToInit, Dependency);
+            ref var lookupJobManager = ref collidersToIgnore.lookupJobManager;
 
-            jobHandle = raycast.Schedule(__groupToDestroy, jobHandle);
+            var jobHandle = raycast.Schedule(__group, JobHandle.CombineDependencies(lookupJobManager.readWriteJobHandle, state.Dependency));
 
-            Dependency = __endFrameBarrier.RemoveComponent<PhysicsShapeCompoundCollider>(__groupToDestroy, jobHandle);
+            lookupJobManager.readWriteJobHandle = jobHandle;
+
+            state.Dependency = jobHandle;
+        }
+    }
+
+    [BurstCompile, UpdateInGroup(typeof(EndFrameEntityCommandSystemGroup))]
+    public partial struct PhysicsRaycastDestroySystem : ISystem
+    {
+        private EntityQuery __group;
+
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __group = builder
+                    .WithAll<PhysicsRaycastCollider>()
+                    .WithNone<PhysicsShapeCompoundCollider>()
+                    .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                    .Build(ref state);
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
+        {
+
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            state.EntityManager.RemoveComponent<PhysicsRaycastCollider>(__group);
         }
     }
 
@@ -203,21 +231,20 @@ namespace ZG.Entities.Physics
         private World __world;
         private BuildPhysicsWorld __buildPhysicsWorld;
         private EndFramePhysicsSystem __endFramePhysicsSystem;
-        private PhysicsRaycastSystem __physicsRaycastSystem;
+        private SharedList<Collider> __collidersToIgnore;
 
         private NativeList<Unity.Physics.RaycastHit> __hits;
 
         public NativeArray<Unity.Physics.RaycastHit> hits => __hits.AsArray();
 
-        public NativeList<Collider> collidersToIgnore
+        public SharedList<Collider> collidersToIgnore
         {
             get
             {
-                if(__physicsRaycastSystem == null)
-                    __physicsRaycastSystem = world.GetExistingSystemManaged<PhysicsRaycastSystem>();
+                if(!__collidersToIgnore.isCreated)
+                    __collidersToIgnore = world.GetExistingSystemUnmanaged<PhysicsRaycastSystem>().collidersToIgnore;
 
-                __physicsRaycastSystem.CompleteReadWriteDependency();
-                return __physicsRaycastSystem.collidersToIgnore;
+                return __collidersToIgnore;
             }
         }
 
@@ -262,6 +289,33 @@ namespace ZG.Entities.Physics
             }
         }
 
+        public void AddColliderToIgnore(in Collider collider)
+        {
+            var collidersToIgnore = this.collidersToIgnore;
+
+            collidersToIgnore.lookupJobManager.CompleteReadWriteDependency();
+            collidersToIgnore.writer.Add(collider);
+        }
+
+        public bool RemoveColliderFromIgnore(in Collider collider)
+        {
+            var collidersToIgnore = this.collidersToIgnore;
+
+            collidersToIgnore.lookupJobManager.CompleteReadWriteDependency();
+
+            var writer = collidersToIgnore.writer; 
+            int colliderIndex = writer.IndexOf(collider);
+
+            if (colliderIndex != -1)
+            {
+                writer.RemoveAt(colliderIndex);
+
+                return true;
+            }
+
+            return false;
+        }
+
         public void ComputeRayAndDistance(PointerEventData eventData, out UnityEngine.Ray ray, out float distanceToClipPlane)
         {
             ray = eventCamera.ScreenPointToRay(eventData.position);
@@ -301,7 +355,12 @@ namespace ZG.Entities.Physics
                 return;
 
             __hits.AsArray().Sort(new Comparable());
-            
+
+            var collidersToIgnore = this.collidersToIgnore;
+            collidersToIgnore.lookupJobManager.CompleteReadOnlyDependency();
+
+            var reader = collidersToIgnore.reader;
+
             int length = __hits.Length;
             float distance;
             Collider collider;
@@ -311,7 +370,6 @@ namespace ZG.Entities.Physics
             RaycastResult raycastResult = default;
             Transform transform;
             EntityManager entityManager = world.EntityManager;
-            var collidersToIgnore = this.collidersToIgnore;
             for (int i = 0; i < length; ++i)
             {
                 hit = __hits[i];
@@ -326,10 +384,10 @@ namespace ZG.Entities.Physics
                 if (distance < nearClipOverride && (collider.value->GetLeafFilter(hit.ColliderKey).BelongsTo & nearClipMask) != 0)
                     continue;
 
-                if (collidersToIgnore.IsCreated)
+                if (collidersToIgnore.isCreated)
                 {
                     collider.entity = rigidbody.Entity;
-                    if (collidersToIgnore.Contains(collider))
+                    if (reader.Contains(collider))
                     {
                         __hits.RemoveAtSwapBack(i--);
 
@@ -338,7 +396,7 @@ namespace ZG.Entities.Physics
                         continue;
                     }
 
-                    if (collider.value->GetLeaf(hit.ColliderKey, out child) && collidersToIgnore.Contains(new Collider() { entity = rigidbody.Entity, value = child.Collider }))
+                    if (collider.value->GetLeaf(hit.ColliderKey, out child) && reader.Contains(new Collider() { entity = rigidbody.Entity, value = child.Collider }))
                     {
                         __hits.RemoveAtSwapBack(i--);
 
