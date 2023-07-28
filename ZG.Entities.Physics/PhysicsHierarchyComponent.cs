@@ -2,6 +2,7 @@ using Unity.Entities;
 using Unity.Transforms;
 using Unity.Physics;
 using BitField = ZG.BitField<Unity.Collections.FixedBytes126>;
+using Unity.Mathematics;
 
 namespace ZG
 {
@@ -48,11 +49,20 @@ namespace ZG
         {
             get
             {
-                ref var collider = ref _database.definition.Value.shapes[0].colliders[0];
-
                 CompoundCollider.ColliderBlobInstance result;
-                result.Collider = _database.colliders[collider.index];
-                result.CompoundFromChild = collider.transform;
+                ref var shape = ref _database.definition.Value.shapes[0];
+                if (shape.colliders.Length > 0)
+                {
+                    ref var collider = ref shape.colliders[0];
+
+                    result.Collider = _database.colliders[collider.index];
+                    result.CompoundFromChild = collider.transform;
+                }
+                else
+                {
+                    result.Collider = BlobAssetReference<Collider>.Null;
+                    result.CompoundFromChild = RigidTransform.identity;
+                }
 
                 return result;
             }
