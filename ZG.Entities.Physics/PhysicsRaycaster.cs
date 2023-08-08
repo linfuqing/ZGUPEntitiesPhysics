@@ -146,7 +146,7 @@ namespace ZG.Entities.Physics
 
             ref var lookupJobManager = ref collidersToIgnore.lookupJobManager;
 
-            var jobHandle = raycast.Schedule(__group, JobHandle.CombineDependencies(lookupJobManager.readWriteJobHandle, state.Dependency));
+            var jobHandle = raycast.ScheduleByRef(__group, JobHandle.CombineDependencies(lookupJobManager.readWriteJobHandle, state.Dependency));
 
             lookupJobManager.readWriteJobHandle = jobHandle;
 

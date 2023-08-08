@@ -502,39 +502,6 @@ namespace ZG
         [UpdateInGroup(typeof(EntityCommandSharedSystemGroup))]
         public partial class System : SystemBase
         {
-            private class Clear : EntityCommandManager.ICommander
-            {
-                public JobHandle jobHandle;
-
-                public NativeList<Entity> entitiesToDestroy;
-                public NativeList<Entity> entitiesToRemove;
-
-                public Clear()
-                {
-                    entitiesToDestroy = new NativeList<Entity>(Allocator.Persistent);
-                    entitiesToRemove = new NativeList<Entity>(Allocator.Persistent);
-                }
-
-                public void Execute(ComponentSystemBase system, ref NativeParallelHashMap<ComponentType, JobHandle> dependency, in JobHandle jobHandle)
-                {
-                    this.jobHandle.Complete();
-                    this.jobHandle = default;
-
-                    var entityManager = system.EntityManager;
-                    entityManager.DestroyEntity(entitiesToDestroy.AsArray());
-                    entityManager.RemoveComponent<PhysicsShapeChildEntity>(entitiesToRemove.AsArray());
-
-                    entitiesToDestroy.Clear();
-                    entitiesToRemove.Clear();
-                }
-
-                public void Dispose()
-                {
-                    entitiesToDestroy.Dispose();
-                    entitiesToRemove.Dispose();
-                }
-            }
-
             [BurstCompile]
             private struct SetColliders : IJobParallelFor
             {
@@ -565,7 +532,8 @@ namespace ZG
 
             private List<PhysicsShapeComponent> __shapes;
 
-            private Clear __clear;
+            private NativeList<Entity> __entitiesToDestroy;
+            private NativeList<Entity> __entitiesToRemove;
 
             public bool MaskRebuild(PhysicsShapeComponent shape)
             {
@@ -616,14 +584,6 @@ namespace ZG
                 __shapes = new List<PhysicsShapeComponent>();
             }
 
-            protected override void OnStartRunning()
-            {
-                base.OnStartRunning();
-
-                __clear = new Clear();
-                World.GetOrCreateSystemManaged<EndEntityObjectSystemGroupEntityCommandSystem>().Create(EntityCommandManager.QUEUE_DESTROY, __clear);
-            }
-
             protected override void OnUpdate()
             {
                 JobHandle? jobHandle = null;
@@ -635,7 +595,7 @@ namespace ZG
                     var transforms = new NativeList<BuildTransform>(Allocator.TempJob);
                     var children = new NativeList<BuildChild>(Allocator.TempJob);
                     var entityArray = new NativeList<Entity>(Allocator.TempJob);
-                    var childCounts = new NativeList<int>(Allocator.TempJob);
+                    var childCounts = new NativeList<int>(Allocator.Temp);
                     int childCount = 0, count;
                     GameObjectEntity gameObjectEntity;
                     NativeList<BuildCollider> colliders = default;
@@ -719,6 +679,30 @@ namespace ZG
                         __shapesToReset.Clear();
                     }
 
+                    if (childCount > 0)
+                    {
+                        ChildBuildEx childBuild;
+                        childBuild.inputs = children.AsArray();
+                        childBuild.transforms = transforms.AsArray();
+                        childBuild.entityArray = entityArray.AsArray();
+                        childBuild.counts = childCounts.AsArray();
+                        childBuild.outputs = GetBufferLookup<PhysicsShapeChild>();
+                        childBuild.childEntities = GetBufferLookup<PhysicsShapeChildEntity>();
+                        childBuild.entitiesToDestroy = __entitiesToDestroy;
+                        childBuild.entitiesToRemove = __entitiesToRemove;
+                        childBuild.Run();
+
+                        var entityManager = EntityManager;
+                        entityManager.DestroyEntity(__entitiesToDestroy.AsArray());
+                        entityManager.DestroyEntity(__entitiesToRemove.AsArray());
+
+                        __entitiesToDestroy.Clear();
+                        __entitiesToRemove.Clear();
+                    }
+
+                    childCounts.Dispose();
+                    children.Dispose();
+
                     if (ranges.IsCreated)
                     {
                         ColliderBuildEx colliderBuild;
@@ -732,32 +716,15 @@ namespace ZG
                         colliderBuild.results = physicsColliders;
                         physicsColliderJobHandle = colliderBuild.Schedule(ranges.Length, innerloopBatchCount, inputDeps);
 
-                        jobHandle = colliders.Dispose(physicsColliderJobHandle);
-                    }
+                        inputDeps = colliders.Dispose(physicsColliderJobHandle);
 
-                    if (childCount > 0)
+                        jobHandle = JobHandle.CombineDependencies(entityArray.Dispose(inputDeps), transforms.Dispose(inputDeps));
+                    }
+                    else
                     {
-                        ChildBuildEx childBuild;
-                        childBuild.inputs = children.AsArray();
-                        childBuild.transforms = transforms.AsArray();
-                        childBuild.entityArray = entityArray.AsArray();
-                        childBuild.counts = childCounts.AsArray();
-                        childBuild.outputs = GetBufferLookup<PhysicsShapeChild>();
-                        childBuild.childEntities = GetBufferLookup<PhysicsShapeChildEntity>();
-                        childBuild.entitiesToDestroy = __clear.entitiesToDestroy;
-                        childBuild.entitiesToRemove = __clear.entitiesToRemove;
-                        inputDeps = childBuild.Schedule(inputDeps);
-
-                        __clear.jobHandle = inputDeps;
-
-                        inputDeps = jobHandle == null ? inputDeps : JobHandle.CombineDependencies(inputDeps, jobHandle.Value);
+                        entityArray.Dispose();
+                        transforms.Dispose();
                     }
-                    else if (jobHandle != null)
-                        inputDeps = jobHandle.Value;
-
-                    jobHandle = JobHandle.CombineDependencies(
-                        childCounts.Dispose(inputDeps),
-                        JobHandle.CombineDependencies(entityArray.Dispose(inputDeps), children.Dispose(inputDeps), transforms.Dispose(inputDeps)));
                 }
 
                 if (__shapesToRefresh != null && __shapesToRefresh.Count > 0)
