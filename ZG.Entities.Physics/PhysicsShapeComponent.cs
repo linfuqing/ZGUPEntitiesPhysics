@@ -10,6 +10,7 @@ using UnityEngine;
 using ZG.Mathematics;
 using Unity.Jobs;
 using Unity.Burst;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace ZG
 {
@@ -125,7 +126,6 @@ namespace ZG
             TriggerDisabled = 0x02
         }
 
-        [Serializable]
         public struct Trigger
         {
             public int index;
@@ -133,33 +133,81 @@ namespace ZG
             public FixedString32Bytes tag;
         }
 
-        [Serializable]
         private struct BuildTransform
         {
             public int parentIndex;
             public EntityTransform value;
         }
 
-        [Serializable]
         private struct BuildCollider
         {
             public int parentIndex;
             public CompoundCollider.ColliderBlobInstance value;
         }
 
-        [Serializable]
         private struct BuildChild
         {
             public int parentIndex;
             public PhysicsShapeChild value;
         }
 
-        [Serializable]
         private struct BuildRange
         {
             public int startIndex;
             public int count;
         }
+
+        /*private struct Container
+        {
+            private struct Data
+            {
+                public UnsafeHashSet<Entity> shapesToRebuild;
+                public UnsafeHashSet<Entity> shapesToReset;
+                public UnsafeHashSet<Entity> shapesToRefresh;
+            }
+
+            private unsafe Data* __data;
+
+            public bool MaskRebuild(in Entity shape)
+            {
+                UnityEngine.Profiling.Profiler.BeginSample("Mask Rebuild");
+
+                __shapesToReset.Remove(shape);
+
+                bool result = __shapesToRebuild.Add(shape);
+
+                UnityEngine.Profiling.Profiler.EndSample();
+
+                return result;
+            }
+
+            public bool MaskReset(PhysicsShapeComponent shape)
+            {
+                UnityEngine.Profiling.Profiler.BeginSample("Mask Reset");
+
+                bool result;
+                if (__shapesToRebuild.Contains(shape))
+                    result = false;
+                else
+                    result = __shapesToReset.Add(shape);
+
+                UnityEngine.Profiling.Profiler.EndSample();
+
+                return result;
+            }
+
+            public bool MaskRefresh(PhysicsShapeComponent shape)
+            {
+                UnityEngine.Profiling.Profiler.BeginSample("Mask Refresh");
+
+                bool result = __shapesToRefresh.Add(shape);
+
+                UnityEngine.Profiling.Profiler.EndSample();
+
+                return result;
+            }
+
+        }*/
 
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Deterministic)]
         private struct ColliderBuild : IJob
@@ -172,7 +220,7 @@ namespace ZG
 
             public NativeArray<BlobAssetReference<Unity.Physics.Collider>> results;
 
-            [Unity.Collections.LowLevel.Unsafe.NativeDisableContainerSafetyRestriction]
+            [NativeDisableContainerSafetyRestriction]
             public NativeList<CompoundCollider.ColliderBlobInstance> colliderBlobInstances;
 
             public static BlobAssetReference<Unity.Physics.Collider> Reset(
@@ -716,7 +764,7 @@ namespace ZG
 
                         var entityManager = EntityManager;
                         entityManager.DestroyEntity(entitiesToDestroy.AsArray());
-                        entityManager.DestroyEntity(entitiesToRemove.AsArray());
+                        entityManager.RemoveComponent<PhysicsShapeChildEntity>(entitiesToRemove.AsArray());
 
                         entitiesToDestroy.Dispose();
                         entitiesToRemove.Dispose();
