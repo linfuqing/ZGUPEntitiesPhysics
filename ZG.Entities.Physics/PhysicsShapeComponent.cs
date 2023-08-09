@@ -532,8 +532,17 @@ namespace ZG
 
             private List<PhysicsShapeComponent> __shapes;
 
-            private NativeList<Entity> __entitiesToDestroy;
-            private NativeList<Entity> __entitiesToRemove;
+            private BufferLookup<PhysicsShapeChild> __children;
+
+            private BufferLookup<PhysicsShapeChildEntity> __childEntities;
+
+            private BufferLookup<PhysicsShapeColliderBlobInstance> __colliderBlobInstances;
+
+            private BufferLookup<PhysicsShapeDestroiedCollider> __destroiedColliders;
+
+            private ComponentLookup<PhysicsShapeCompoundCollider> __compoundColliders;
+
+            private ComponentLookup<PhysicsCollider> __physicsColliders;
 
             public bool MaskRebuild(PhysicsShapeComponent shape)
             {
@@ -578,6 +587,14 @@ namespace ZG
             {
                 base.OnCreate();
 
+                __children = GetBufferLookup<PhysicsShapeChild>();
+                __childEntities = GetBufferLookup<PhysicsShapeChildEntity>();
+
+                __colliderBlobInstances = GetBufferLookup<PhysicsShapeColliderBlobInstance>();
+
+                __compoundColliders = GetComponentLookup<PhysicsShapeCompoundCollider>();
+                __physicsColliders = GetComponentLookup<PhysicsCollider>();
+
                 __shapesToRebuild = new HashSet<PhysicsShapeComponent>();
                 __shapesToReset = new HashSet<PhysicsShapeComponent>();
                 __shapesToRefresh = new HashSet<PhysicsShapeComponent>();
@@ -586,10 +603,10 @@ namespace ZG
 
             protected override void OnUpdate()
             {
+                ref var state = ref this.GetState();
+
                 JobHandle? jobHandle = null;
                 JobHandle inputDeps = Dependency, physicsColliderJobHandle = inputDeps;
-                var physicsColliders = GetComponentLookup<PhysicsCollider>();
-                var compoundColliders = GetComponentLookup<PhysicsShapeCompoundCollider>();
                 if (__shapesToRebuild != null && __shapesToRebuild.Count > 0 || __shapesToReset != null && __shapesToReset.Count > 0)
                 {
                     var transforms = new NativeList<BuildTransform>(Allocator.TempJob);
@@ -681,23 +698,28 @@ namespace ZG
 
                     if (childCount > 0)
                     {
+                        CompleteDependency();
+
+                        var entitiesToDestroy = new NativeList<Entity>(Allocator.TempJob);
+                        var entitiesToRemove = new NativeList<Entity>(Allocator.TempJob);
+
                         ChildBuildEx childBuild;
                         childBuild.inputs = children.AsArray();
                         childBuild.transforms = transforms.AsArray();
                         childBuild.entityArray = entityArray.AsArray();
                         childBuild.counts = childCounts.AsArray();
-                        childBuild.outputs = GetBufferLookup<PhysicsShapeChild>();
-                        childBuild.childEntities = GetBufferLookup<PhysicsShapeChildEntity>();
-                        childBuild.entitiesToDestroy = __entitiesToDestroy;
-                        childBuild.entitiesToRemove = __entitiesToRemove;
+                        childBuild.outputs = __children.UpdateAsRef(ref state);
+                        childBuild.childEntities = __childEntities.UpdateAsRef(ref state);
+                        childBuild.entitiesToDestroy = entitiesToDestroy;
+                        childBuild.entitiesToRemove = entitiesToRemove;
                         childBuild.Run();
 
                         var entityManager = EntityManager;
-                        entityManager.DestroyEntity(__entitiesToDestroy.AsArray());
-                        entityManager.DestroyEntity(__entitiesToRemove.AsArray());
+                        entityManager.DestroyEntity(entitiesToDestroy.AsArray());
+                        entityManager.DestroyEntity(entitiesToRemove.AsArray());
 
-                        __entitiesToDestroy.Clear();
-                        __entitiesToRemove.Clear();
+                        entitiesToDestroy.Dispose();
+                        entitiesToRemove.Dispose();
                     }
 
                     childCounts.Dispose();
@@ -710,11 +732,11 @@ namespace ZG
                         colliderBuild.colliders = colliders.AsArray();
                         colliderBuild.ranges = ranges;
                         colliderBuild.entityArray = entityArray.AsArray();
-                        colliderBuild.colliderBlobInstances = GetBufferLookup<PhysicsShapeColliderBlobInstance>();
-                        colliderBuild.oldValues = GetBufferLookup<PhysicsShapeDestroiedCollider>();
-                        colliderBuild.values = compoundColliders;
-                        colliderBuild.results = physicsColliders;
-                        physicsColliderJobHandle = colliderBuild.Schedule(ranges.Length, innerloopBatchCount, inputDeps);
+                        colliderBuild.colliderBlobInstances = __colliderBlobInstances.UpdateAsRef(ref state);
+                        colliderBuild.oldValues = __destroiedColliders.UpdateAsRef(ref state);
+                        colliderBuild.values = __compoundColliders.UpdateAsRef(ref state);
+                        colliderBuild.results = __physicsColliders.UpdateAsRef(ref state);
+                        physicsColliderJobHandle = colliderBuild.ScheduleByRef(ranges.Length, innerloopBatchCount, inputDeps);
 
                         inputDeps = colliders.Dispose(physicsColliderJobHandle);
 
@@ -743,9 +765,9 @@ namespace ZG
 
                     SetColliders setColliders;
                     setColliders.entityArray = entitiesToRefresh.AsArray();
-                    setColliders.inputs = compoundColliders;
-                    setColliders.outputs = physicsColliders;
-                    physicsColliderJobHandle = setColliders.Schedule(entitiesToRefresh.Length, innerloopBatchCount, physicsColliderJobHandle);
+                    setColliders.inputs = __compoundColliders.UpdateAsRef(ref state);
+                    setColliders.outputs = __physicsColliders.UpdateAsRef(ref state);
+                    physicsColliderJobHandle = setColliders.ScheduleByRef(entitiesToRefresh.Length, innerloopBatchCount, physicsColliderJobHandle);
 
                     physicsColliderJobHandle = entitiesToRefresh.Dispose(physicsColliderJobHandle);
 
