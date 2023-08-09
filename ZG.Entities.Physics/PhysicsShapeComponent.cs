@@ -595,6 +595,8 @@ namespace ZG
 
                 __colliderBlobInstances = GetBufferLookup<PhysicsShapeColliderBlobInstance>();
 
+                __destroiedColliders = GetBufferLookup<PhysicsShapeDestroiedCollider>();
+
                 __compoundColliders = GetComponentLookup<PhysicsShapeCompoundCollider>();
                 __physicsColliders = GetComponentLookup<PhysicsCollider>();
 
@@ -617,7 +619,7 @@ namespace ZG
                     var transforms = new NativeList<BuildTransform>(Allocator.TempJob);
                     var children = new NativeList<BuildChild>(Allocator.TempJob);
                     var entityArray = new NativeList<Entity>(Allocator.TempJob);
-                    var childCounts = new NativeList<int>(Allocator.Temp);
+                    var childCounts = new NativeList<int>(Allocator.TempJob);
                     int childCount = 0, count;
                     GameObjectEntity gameObjectEntity;
                     NativeList<BuildCollider> colliders = default;
