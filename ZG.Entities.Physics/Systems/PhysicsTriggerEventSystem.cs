@@ -20,7 +20,7 @@ namespace ZG
         public ColliderKey colliderKeyA;
     }
 
-    [AlwaysUpdateSystem, UpdateInGroup(typeof(FixedStepSimulationSystemGroup)), UpdateBefore(typeof(EndFramePhysicsSystem)), UpdateAfter(typeof(StepPhysicsWorld))]
+    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup)), UpdateBefore(typeof(EndFramePhysicsSystem)), UpdateAfter(typeof(StepPhysicsWorld))]
     public partial class PhysicsTriggerEventSystem : SystemBase
     {
         [BurstCompile]

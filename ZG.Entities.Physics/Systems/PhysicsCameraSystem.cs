@@ -178,13 +178,26 @@ namespace ZG
     {
         private EntityQuery __group;
 
+        private ComponentTypeHandle<Translation> __translationType;
+
+        private ComponentTypeHandle<PhysicsCameraTarget> __targetType;
+
+        private ComponentTypeHandle<PhysicsCameraCollider> __colliderType;
+
+        private ComponentTypeHandle<PhysicsCameraDisplacement> __displacementType;
+
         public PhysicsCameraSystemCore(ref SystemState state)
         {
-            __group = state.GetEntityQuery(
-                ComponentType.ReadOnly<Translation>(),
-                ComponentType.ReadOnly<PhysicsCameraTarget>(),
-                ComponentType.ReadOnly<PhysicsCameraCollider>(),
-                ComponentType.ReadWrite<PhysicsCameraDisplacement>());
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __group = builder
+                        .WithAll<Translation, PhysicsCameraTarget, PhysicsCameraCollider>()
+                        .WithAllRW<PhysicsCameraDisplacement>()
+                        .Build(ref state);
+
+            __translationType = state.GetComponentTypeHandle<Translation>(true);
+            __targetType = state.GetComponentTypeHandle<PhysicsCameraTarget>(true);
+            __colliderType = state.GetComponentTypeHandle<PhysicsCameraCollider>(true);
+            __displacementType = state.GetComponentTypeHandle<PhysicsCameraDisplacement>();
         }
 
         public void Update<T>(
@@ -194,13 +207,13 @@ namespace ZG
         {
             PhysicsCameraApply<T> apply;
             apply.collisionWorld = collisionWorld;
-            apply.translationType = state.GetComponentTypeHandle<Translation>(true);
-            apply.targetType = state.GetComponentTypeHandle<PhysicsCameraTarget>(true);
-            apply.colliderType = state.GetComponentTypeHandle<PhysicsCameraCollider>(true);
-            apply.displacementType = state.GetComponentTypeHandle<PhysicsCameraDisplacement>();
+            apply.translationType = __translationType.UpdateAsRef(ref state);
+            apply.targetType = __targetType.UpdateAsRef(ref state);
+            apply.colliderType = __colliderType.UpdateAsRef(ref state);
+            apply.displacementType = __displacementType.UpdateAsRef(ref state);
             apply.handler = handler;
 
-            state.Dependency = apply.ScheduleParallel(__group, state.Dependency);
+            state.Dependency = apply.ScheduleParallelByRef(__group, state.Dependency);
         }
     }
 }

@@ -352,56 +352,45 @@ namespace ZG
             out EntityArchetype eventArchetype, 
             out EntityArchetype hitArchetype)
         {
-            BurstUtility.InitializeJobParallelFor<Init>();
-            BurstUtility.InitializeJob<DisposeAll>();
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                groupToDestroy = builder
+                        .WithAll<PhysicsHierarchyID>()
+                        .WithNone<PhysicsHierarchyData>()
+                        .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                        .Build(ref systemState);
 
-            groupToDestroy = systemState.GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsHierarchyID>()
-                    },
-                    None = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsHierarchyData>()
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
-
-            groupToCreate = systemState.GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsHierarchyData>()
-                    },
-                    None = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsHierarchyID>()
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                groupToCreate = builder
+                    .WithAll<PhysicsHierarchyData>()
+                    .WithNone<PhysicsHierarchyID>()
+                    .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                    .Build(ref systemState);
 
             var entityManager = systemState.EntityManager;
 
-            eventArchetype = entityManager.CreateArchetype(
-                ComponentType.ReadOnly<Prefab>(), 
+            using (var types = new NativeList<ComponentType>(Allocator.Temp)
+            {
+                ComponentType.ReadOnly<Prefab>(),
                 ComponentType.ReadOnly<PhysicsShapeParent>(),
                 ComponentType.ReadOnly<PhysicsCollider>(),
                 ComponentType.ReadWrite<Translation>(),
                 ComponentType.ReadWrite<Rotation>(),
                 ComponentType.ReadWrite<PhysicsVelocity>(),
-                ComponentType.ReadWrite<PhysicsTriggerEvent>());
+                ComponentType.ReadWrite<PhysicsTriggerEvent>()
+            })
+                eventArchetype = entityManager.CreateArchetype(types.AsArray());
 
-            hitArchetype = entityManager.CreateArchetype(
-                ComponentType.ReadOnly<Prefab>(), 
+            using (var types = new NativeList<ComponentType>(Allocator.Temp)
+            {
+                ComponentType.ReadOnly<Prefab>(),
                 ComponentType.ReadOnly<PhysicsShapeParent>(),
                 ComponentType.ReadOnly<PhysicsShapeCollider>(),
                 ComponentType.ReadWrite<Translation>(),
                 ComponentType.ReadWrite<Rotation>(),
                 ComponentType.ReadWrite<PhysicsVelocity>(),
-                ComponentType.ReadWrite<PhysicsShapeChildHit>());
+                ComponentType.ReadWrite<PhysicsShapeChildHit>()
+            })
+                hitArchetype = entityManager.CreateArchetype(types.AsArray());
         }
 
         //[BurstCompile]

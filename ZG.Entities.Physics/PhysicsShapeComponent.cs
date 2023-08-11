@@ -500,7 +500,7 @@ namespace ZG
             }
         }
 
-        [UpdateInGroup(typeof(EntityCommandSharedSystemGroup))]
+        [CreateAfter(typeof(EntityCommanderSystem)), UpdateInGroup(typeof(EntityCommandSharedSystemGroup))]
         public partial class System : SystemBase
         {
             [BurstCompile]
@@ -605,7 +605,7 @@ namespace ZG
                 __shapesToRefresh = new HashSet<PhysicsShapeComponent>();
                 __shapes = new List<PhysicsShapeComponent>();
 
-                __commander = World.GetOrCreateSystemUnmanaged<EntityCommanderSystem>().value;
+                __commander = World.GetExistingSystemUnmanaged<EntityCommanderSystem>().value;
             }
 
             protected override void OnUpdate()

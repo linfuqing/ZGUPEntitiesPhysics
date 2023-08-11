@@ -47,6 +47,7 @@ namespace ZG
             private set;
         }
 
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             PhysicsHierarchyUtility.InitQueryAndArchetypes(
@@ -56,14 +57,17 @@ namespace ZG
                 out __eventArchetype, 
                 out __hitArchetype);
 
-            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.instance;
+            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.Retain();
 
             prefabs = new SharedHashMap<int, BlobAssetReference<PhysicsHierarchyPrefab>>(Allocator.Persistent);
         }
 
+        //[BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
             prefabs.Dispose();
+
+            __colliders.Release();
         }
 
         [BurstCompile]
@@ -86,7 +90,7 @@ namespace ZG
         }
     }
 
-    [BurstCompile, UpdateInGroup(typeof(PhysicsHierarchyTriggerSystemGroup))]
+    [BurstCompile, CreateAfter(typeof(PhysicsHierarchyTriggerFactroySystem)), UpdateInGroup(typeof(PhysicsHierarchyTriggerSystemGroup))]
     public partial struct PhysicsHierarchyTriggerSystem : ISystem
     {
         private struct Key : IEquatable<Key>
@@ -641,6 +645,31 @@ namespace ZG
         private EntityQuery __groupToInit;
         private EntityQuery __groupToDisable;
         private EntityQuery __groupToEnable;
+
+        private EntityTypeHandle __entityType;
+
+        private ComponentTypeHandle<PhysicsHierarchyData> __instanceType;
+
+        private ComponentTypeHandle<PhysicsHierarchyTriggersBitField> __bitFieldType;
+
+        private BufferTypeHandle<PhysicsHierarchyInactiveTriggers> __inactiveTriggersType;
+
+        private BufferTypeHandle<PhysicsShapeChild> __shapeChildType;
+
+        private BufferTypeHandle<PhysicsShapeChildEntity> __shapeChildEntityType;
+
+        private ComponentLookup<PhysicsHierarchyData> __instances;
+
+        private BufferLookup<PhysicsShapeDestroiedCollider> __destroiedColliders;
+
+        private BufferLookup<PhysicsShapeChild> __children;
+
+        private BufferLookup<PhysicsShapeChildEntity> __childEntities;
+
+        private ComponentLookup<PhysicsHierarchyTriggersBitField> __bitFields;
+
+        private ComponentLookup<PhysicsShapeParent> __parents;
+
         private SingletonAssetContainer<BlobAssetReference<Collider>> __colliders;
         private SharedHashMap<int, BlobAssetReference<PhysicsHierarchyPrefab>> __prefabs;
         private NativeParallelHashMap<Key, int> __triggerEntityOffsets;
@@ -656,51 +685,57 @@ namespace ZG
         private ProfilerMarker __instantiate;
 #endif
 
+        [BurstCompile]
+
         public void OnCreate(ref SystemState state)
         {
             BurstUtility.InitializeJobParallelFor<Init>();
 
-            __groupToInit = state.GetEntityQuery(
-                ComponentType.ReadOnly<PhysicsHierarchyTriggersBitField>(),
-                ComponentType.ReadOnly<PhysicsShapeChild>(),
-                ComponentType.Exclude<PhysicsShapeChildEntity>());
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __groupToInit = builder
+                        .WithAll<PhysicsHierarchyTriggersBitField, PhysicsShapeChild>()
+                        .WithNone<PhysicsShapeChildEntity>()
+                        .Build(ref state);
 
-            __groupToDisable = state.GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadWrite<PhysicsHierarchyTriggersBitField>(),
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __groupToDisable = builder
+                    .WithAll<Disabled>()
+                    .WithAllRW<PhysicsHierarchyTriggersBitField>()
+                    .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                    .Build(ref state);
+            __groupToDisable.SetChangedVersionFilter(ComponentType.ReadOnly<Disabled>());
 
-                        ComponentType.ReadOnly<Disabled>()
-                    },
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
-            __groupToDisable.SetChangedVersionFilter(typeof(Disabled));
-
-            __groupToEnable = state.GetEntityQuery(
-                ComponentType.ReadOnly<PhysicsHierarchyData>(),
-                ComponentType.ReadOnly<PhysicsHierarchyInactiveTriggers>(),
-                ComponentType.ReadWrite<PhysicsHierarchyTriggersBitField>());
-            __groupToEnable.SetChangedVersionFilter(
-                typeof(PhysicsHierarchyInactiveTriggers)
-                /*new ComponentType[]
-                {
-                    typeof(PhysicsHierarchyInactiveTriggers), 
-                    typeof(PhysicsHierarchyTriggersBitField)
-                }*/);
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __groupToEnable = builder
+                    .WithAll<PhysicsHierarchyData, PhysicsHierarchyInactiveTriggers>()
+                    .WithAllRW<PhysicsHierarchyTriggersBitField>()
+                    .Build(ref state);
+            __groupToEnable.SetChangedVersionFilter(ComponentType.ReadOnly<PhysicsHierarchyInactiveTriggers>());
             __groupToEnable.AddOrderVersionFilter();
+
+            __entityType = state.GetEntityTypeHandle();
+            __instanceType = state.GetComponentTypeHandle<PhysicsHierarchyData>(true);
+            __bitFieldType = state.GetComponentTypeHandle<PhysicsHierarchyTriggersBitField>();
+            __inactiveTriggersType = state.GetBufferTypeHandle<PhysicsHierarchyInactiveTriggers>();
+            __shapeChildType = state.GetBufferTypeHandle<PhysicsShapeChild>();
+            __shapeChildEntityType = state.GetBufferTypeHandle<PhysicsShapeChildEntity>();
+
+            __instances = state.GetComponentLookup<PhysicsHierarchyData>(true);
+            __destroiedColliders = state.GetBufferLookup<PhysicsShapeDestroiedCollider>();
+            __children = state.GetBufferLookup<PhysicsShapeChild>();
+            __childEntities = state.GetBufferLookup<PhysicsShapeChildEntity>();
+            __bitFields = state.GetComponentLookup<PhysicsHierarchyTriggersBitField>();
+            __parents = state.GetComponentLookup<PhysicsShapeParent>();
 
             __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.instance;
 
-            __prefabs = state.World.GetOrCreateSystemUnmanaged<PhysicsHierarchyTriggerFactroySystem>().prefabs;
+            __prefabs = state.WorldUnmanaged.GetExistingSystemUnmanaged<PhysicsHierarchyTriggerFactroySystem>().prefabs;
 
             __triggerCount = new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             __triggerEntitiesToCreate = new NativeParallelMultiHashMap<Key, Entity>(1, Allocator.Persistent);
             __triggerEntityOffsets = new NativeParallelHashMap<Key, int>(1, Allocator.Persistent);
             __triggerEntitiesToDestroy = new NativeList<Entity>(Allocator.Persistent);
             __values = new NativeList<Value>(Allocator.Persistent);
-
 
 #if ENABLE_PROFILER
             __init = new ProfilerMarker("Physics Triggers Init");
@@ -710,6 +745,7 @@ namespace ZG
 #endif
         }
 
+        //[BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
             __values.Dispose();
@@ -722,8 +758,6 @@ namespace ZG
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            state.CompleteDependency();
-
             var entityManager = state.EntityManager;
 
 #if ENABLE_PROFILER
@@ -733,8 +767,7 @@ namespace ZG
                 entityManager.AddComponent<PhysicsShapeChildEntity>(__groupToInit);
             }
 
-            NativeList<Entity> triggerEntitiesToDestroy = __triggerEntitiesToDestroy;
-            triggerEntitiesToDestroy.Clear();
+            __triggerEntitiesToDestroy.Clear();
 
 #if ENABLE_PROFILER
             using (__disable.Auto())
@@ -742,11 +775,13 @@ namespace ZG
             {
                 if (!__groupToDisable.IsEmpty)
                 {
+                    state.CompleteDependency();
+
                     DisableEx disable;
-                    disable.bitFieldType = state.GetComponentTypeHandle<PhysicsHierarchyTriggersBitField>();
-                    disable.shapeChildType = state.GetBufferTypeHandle<PhysicsShapeChild>();
-                    disable.shapeChildEntityType = state.GetBufferTypeHandle<PhysicsShapeChildEntity>();
-                    disable.triggerEntitiesToDestroy = triggerEntitiesToDestroy;
+                    disable.bitFieldType = __bitFieldType.UpdateAsRef(ref state);
+                    disable.shapeChildType = __shapeChildType.UpdateAsRef(ref state);
+                    disable.shapeChildEntityType = __shapeChildEntityType.UpdateAsRef(ref state);
+                    disable.triggerEntitiesToDestroy = __triggerEntitiesToDestroy;
 
                     disable.Run(__groupToDisable);
                 }
@@ -757,33 +792,33 @@ namespace ZG
 #endif
             {
                 if (__groupToEnable.IsEmpty)
-                    entityManager.DestroyEntity(triggerEntitiesToDestroy.AsArray());
+                    entityManager.DestroyEntity(__triggerEntitiesToDestroy.AsArray());
                 else
                 {
-                    NativeParallelMultiHashMap<Key, Entity> triggerEntitiesToCreate = __triggerEntitiesToCreate;
-                    triggerEntitiesToCreate.Clear();
+                    state.CompleteDependency();
 
-                    NativeList<Value> values = __values;
-                    values.Clear();
+                    __triggerEntitiesToCreate.Clear();
+
+                    __values.Clear();
 
                     __triggerCount[0] = 0;
 
                     EnableEx enable;
-                    enable.entityType = state.GetEntityTypeHandle();
-                    enable.instanceType = state.GetComponentTypeHandle<PhysicsHierarchyData>(true);
-                    enable.bitFieldType = state.GetComponentTypeHandle<PhysicsHierarchyTriggersBitField>(true);
-                    enable.inactiveTriggersType = state.GetBufferTypeHandle<PhysicsHierarchyInactiveTriggers>(true);
-                    enable.shapeChildType = state.GetBufferTypeHandle<PhysicsShapeChild>(true);
-                    enable.shapeChildEntityType = state.GetBufferTypeHandle<PhysicsShapeChildEntity>(true);
+                    enable.entityType = __entityType.UpdateAsRef(ref state);
+                    enable.instanceType = __instanceType.UpdateAsRef(ref state);
+                    enable.bitFieldType = __bitFieldType.UpdateAsRef(ref state);
+                    enable.inactiveTriggersType = __inactiveTriggersType.UpdateAsRef(ref state);
+                    enable.shapeChildType = __shapeChildType.UpdateAsRef(ref state);
+                    enable.shapeChildEntityType = __shapeChildEntityType.UpdateAsRef(ref state);
                     enable.triggerCount = __triggerCount;
-                    enable.triggerEntitiesToCreate = triggerEntitiesToCreate;
-                    enable.triggerEntitiesToDestroy = triggerEntitiesToDestroy;
-                    enable.values = values;
+                    enable.triggerEntitiesToCreate = __triggerEntitiesToCreate;
+                    enable.triggerEntitiesToDestroy = __triggerEntitiesToDestroy;
+                    enable.values = __values;
                     enable.Run(__groupToEnable);
 
-                    entityManager.DestroyEntity(triggerEntitiesToDestroy.AsArray());
+                    entityManager.DestroyEntity(__triggerEntitiesToDestroy.AsArray());
 
-                    if (values.Length > 0)
+                    if (__values.Length > 0)
                     {
                         var triggerEntityArray = new NativeArray<Entity>(__triggerCount[0], Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -792,7 +827,7 @@ namespace ZG
 #if ENABLE_PROFILER
                         using (__instantiate.Auto())
 #endif
-                        using (var keys = triggerEntitiesToCreate.GetKeyArray(Allocator.Temp))
+                        using (var keys = __triggerEntitiesToCreate.GetKeyArray(Allocator.Temp))
                         {
                             __prefabs.lookupJobManager.CompleteReadOnlyDependency();
 
@@ -805,7 +840,7 @@ namespace ZG
 
                                 __triggerEntityOffsets[key] = entityOffset;
 
-                                numEntities = triggerEntitiesToCreate.CountValuesForKey(key);
+                                numEntities = __triggerEntitiesToCreate.CountValuesForKey(key);
 
                                 ref var shape = ref prefabs[key.instanceID].Value.shapes[key.shapeIndex];
                                 numTriggers = shape.triggers.Length;
@@ -820,20 +855,18 @@ namespace ZG
 
                         Init init;
                         init.colliders = __colliders.reader;
-                        init.triggerEntities = triggerEntitiesToCreate;
+                        init.triggerEntities = __triggerEntitiesToCreate;
                         init.triggerEntityOffsets = __triggerEntityOffsets;
                         init.triggerEntityArray = triggerEntityArray;
-                        init.values = values.AsArray();
-                        init.instances = state.GetComponentLookup<PhysicsHierarchyData>(true);
-                        init.destroiedColliders = state.GetBufferLookup<PhysicsShapeDestroiedCollider>();
-                        init.children = state.GetBufferLookup<PhysicsShapeChild>();
-                        init.childEntities = state.GetBufferLookup<PhysicsShapeChildEntity>();
-                        /*init.compoundColliderType = state.GetComponentTypeHandle<PhysicsShapeCompoundCollider>();
-                        init.resultType = state.GetComponentTypeHandle<PhysicsCollider>();*/
-                        init.bitFields = state.GetComponentLookup<PhysicsHierarchyTriggersBitField>();
-                        init.parents = state.GetComponentLookup<PhysicsShapeParent>();
+                        init.values = __values.AsArray();
+                        init.instances = __instances.UpdateAsRef(ref state);
+                        init.destroiedColliders = __destroiedColliders.UpdateAsRef(ref state);
+                        init.children = __children.UpdateAsRef(ref state);
+                        init.childEntities = __childEntities.UpdateAsRef(ref state);
+                        init.bitFields = __bitFields.UpdateAsRef(ref state);
+                        init.parents = __parents.UpdateAsRef(ref state);
 
-                        var jobHandle = init.Schedule(values.Length, InnerloopBatchCount, state.Dependency);
+                        var jobHandle = init.ScheduleByRef(__values.Length, InnerloopBatchCount, state.Dependency);
 
                         __colliders.AddDependency(state.GetSystemID(), jobHandle);
 
