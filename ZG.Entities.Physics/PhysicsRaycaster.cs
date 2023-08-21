@@ -17,7 +17,7 @@ namespace ZG.Entities.Physics
         public BlobAssetReference<Unity.Physics.Collider> value;
     }
 
-    [BurstCompile]
+    [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup))]
     public partial struct PhysicsRaycastSystem : ISystem
     {
         private struct Raycast
@@ -154,7 +154,7 @@ namespace ZG.Entities.Physics
         }
     }
 
-    [BurstCompile, UpdateInGroup(typeof(EndFrameEntityCommandSystemGroup))]
+    [BurstCompile, UpdateInGroup(typeof(PresentationSystemGroup), OrderLast = true)]
     public partial struct PhysicsRaycastDestroySystem : ISystem
     {
         private EntityQuery __group;

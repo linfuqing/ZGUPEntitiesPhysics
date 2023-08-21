@@ -22,7 +22,7 @@ namespace ZG
     }
 
     //[UpdateInGroup(typeof(EntityObjectSystemGroup), OrderLast = true), UpdateAfter(typeof(EndEntityObjectSystemGroupEntityCommandSystem))]
-    [UpdateInGroup(typeof(InitializationSystemGroup)), UpdateAfter(typeof(BeginFrameEntityCommandSystem))]
+    [UpdateInGroup(typeof(InitializationSystemGroup))/*, UpdateAfter(typeof(BeginFrameEntityCommandSystem))*/]
     public partial class PhysicsHierarchyTriggerSystemGroup : ComponentSystemGroup
     {
 
