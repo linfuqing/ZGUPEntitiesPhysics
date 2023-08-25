@@ -14,33 +14,29 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace ZG
 {
-    [Serializable]
     public struct PhysicsShapeCompoundCollider : IComponentData
     {
         public BlobAssetReference<Unity.Physics.Collider> value;
     }
 
-    [Serializable]
     public struct PhysicsShapeParent : IComponentData
     {
         public int index;
         public Entity entity;
     }
 
-    [Serializable]
     public struct PhysicsShapeCollider : IComponentData
     {
         public float contactTolerance;
         public BlobAssetReference<Unity.Physics.Collider> value;
     }
 
-    [Serializable]
     public struct PhysicsShapeColliderBlobInstance : IBufferElementData
     {
         public CompoundCollider.ColliderBlobInstance value;
     }
 
-    [Serializable, InternalBufferCapacity(1)]
+    [InternalBufferCapacity(1)]
     public struct PhysicsShapeChild : IBufferElementData
     {
         [Flags]
@@ -59,28 +55,25 @@ namespace ZG
         public BlobAssetReference<Unity.Physics.Collider> collider;
     }
 
-    [Serializable, InternalBufferCapacity(1)]
+    [InternalBufferCapacity(1)]
     public struct PhysicsShapeChildHit : IBufferElementData
     {
         public RigidBody rigidbody;
         public DistanceHit value;
     }
 
-    [Serializable]
-    public struct PhysicsShapeTriggerEventRevicer : IBufferElementData
+    /*public struct PhysicsShapeTriggerEventRevicer : IBufferElementData
     {
         public int eventIndex;
 
         public Entity entity;
-    }
+    }*/
 
-    [Serializable]
     public struct PhysicsShapeChildEntity : ICleanupBufferElementData
     {
         public Entity value;
     }
 
-    [Serializable]
     public struct PhysicsShapeDestroiedCollider : ICleanupBufferElementData
     {
         public uint hash;
@@ -126,11 +119,12 @@ namespace ZG
             TriggerDisabled = 0x02
         }
 
+        [Serializable]
         public struct Trigger
         {
             public int index;
             public int childIndex;
-            public FixedString32Bytes tag;
+            public string tag;
         }
 
         private struct BuildTransform
@@ -715,7 +709,7 @@ namespace ZG
                         colliderBuild.values = __compoundColliders.UpdateAsRef(ref state);
                         colliderBuild.results = __physicsColliders.UpdateAsRef(ref state);
 
-                        physicsColliderJobHandle = colliderBuild.Schedule(ranges.Length, innerloopBatchCount, inputDeps);
+                        physicsColliderJobHandle = colliderBuild.ScheduleByRef(ranges.Length, innerloopBatchCount, inputDeps);
 
                         jobHandle = colliders.Dispose(physicsColliderJobHandle);
                     }
@@ -734,13 +728,33 @@ namespace ZG
                         inputDeps = childBuild.ScheduleByRef(JobHandle.CombineDependencies(inputDeps, __commander.jobHandle));
 
                         __commander.jobHandle = inputDeps;
-                    }
-                    else if (jobHandle != null)
-                        inputDeps = jobHandle.Value;
 
-                    jobHandle = JobHandle.CombineDependencies(
-                        childCounts.Dispose(inputDeps),
-                        JobHandle.CombineDependencies(entityArray.Dispose(inputDeps), children.Dispose(inputDeps), transforms.Dispose(inputDeps)));
+                        var result = JobHandle.CombineDependencies(children.Dispose(inputDeps), childCounts.Dispose(inputDeps));
+
+                        if (jobHandle != null)
+                            inputDeps = JobHandle.CombineDependencies(inputDeps, jobHandle.Value);
+
+                        inputDeps = JobHandle.CombineDependencies(entityArray.Dispose(inputDeps), transforms.Dispose(inputDeps));
+
+                        jobHandle = JobHandle.CombineDependencies(inputDeps, result);
+                    }
+                    else
+                    {
+                        children.Dispose();
+                        childCounts.Dispose();
+
+                        if (jobHandle == null)
+                        {
+                            entityArray.Dispose();
+                            transforms.Dispose();
+                        }
+                        else
+                        {
+                            inputDeps = jobHandle.Value;
+
+                            jobHandle = JobHandle.CombineDependencies(entityArray.Dispose(inputDeps), transforms.Dispose(inputDeps));
+                        }
+                    }
                 }
 
                 if (__shapesToRefresh != null && __shapesToRefresh.Count > 0)

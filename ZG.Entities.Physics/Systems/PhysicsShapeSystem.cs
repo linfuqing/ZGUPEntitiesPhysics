@@ -855,9 +855,8 @@ namespace ZG
         }
     }
 
-    //TODO: ToBurst
-    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup)), UpdateAfter(typeof(PhysicsTriggerEventSystem)), UpdateBefore(typeof(EndFramePhysicsSystem))]
-    public partial class PhysicsShapeTriggerEventRevicerSystem : SystemBase
+    /*[BurstCompile, UpdateInGroup(typeof(FixedStepSimulationSystemGroup)), UpdateAfter(typeof(PhysicsTriggerEventSystem)), UpdateBefore(typeof(EndFramePhysicsSystem))]
+    public partial struct PhysicsShapeTriggerEventRevicerSystem : ISystem
     {
         private struct CollectTriggerEvents
         {
@@ -949,7 +948,7 @@ namespace ZG
         {
             base.OnCreate();
 
-            __group = GetEntityQuery(/*ComponentType.ReadOnly<PhysicsShapeParent>(), */ComponentType.ReadOnly<PhysicsTriggerEvent>());
+            __group = GetEntityQuery(ComponentType.ReadOnly<PhysicsTriggerEvent>());
 
             __results = new NativeQueue<EntityData<PhysicsShapeTriggerEventRevicer>>(Allocator.Persistent);
         }
@@ -980,5 +979,5 @@ namespace ZG
 
             Dependency = applyRevicers.Schedule(jobHandle);
         }
-    }
+    }*/
 }
