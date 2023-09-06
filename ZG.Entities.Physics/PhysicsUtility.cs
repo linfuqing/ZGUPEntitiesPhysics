@@ -78,49 +78,6 @@ namespace ZG
         #endregion
     }
 
-    public struct FarthestHitCollectorExcludeDynamicBodies<T> : ICollector<T> where T : struct, IQueryResult
-    {
-        private int __dynamicBodyCount;
-
-        public bool EarlyOutOnFirstHit => false;
-
-        public int NumHits { get; private set; }
-
-        public float MaxFraction { get; private set; }
-
-        public T farthestHit { get; private set; }
-
-        public FarthestHitCollectorExcludeDynamicBodies(int dynamicBodyCount, float maxFraction)
-        {
-            __dynamicBodyCount = dynamicBodyCount;
-
-            NumHits = 0;
-            MaxFraction = maxFraction;
-
-            farthestHit = default;
-        }
-
-        #region ICollector
-
-        public bool AddHit(T hit)
-        {
-            if (hit.RigidBodyIndex < __dynamicBodyCount)
-                return false;
-
-            if (!PhysicsUtility.IsFarHit(farthestHit, hit, NumHits))
-                return false;
-
-            farthestHit = hit;
-            MaxFraction = hit.Fraction - math.FLT_MIN_NORMAL;
-            NumHits = 1;
-
-            return true;
-        }
-
-        #endregion
-    }
-
-
     public struct ClosestHitCollectorExclude<T> : ICollector<T> where T : struct, IQueryResult
     {
         private int __rigidBodyIndex;
@@ -249,11 +206,6 @@ namespace ZG
         public static bool IsCloserHit<T>(in T source, in T destination, int hitCount) where T : struct, IQueryResult
         {
             return hitCount < 1 || CompareHit(destination, source) < 0;
-        }
-
-        public static bool IsFarHit<T>(in T source, in T destination, int hitCount) where T : struct, IQueryResult
-        {
-            return hitCount < 1 || CompareHit(destination, source) > 0;
         }
 
         public static bool IsTrigger(this ref Collider collider)
