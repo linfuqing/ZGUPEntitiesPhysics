@@ -22,14 +22,14 @@ namespace ZG
         [UnityEngine.SerializeField]
         internal PhysicsHierarchyDatabase _database;
 
-#if UNITY_EDITOR
         public PhysicsHierarchyDatabase database
         {
             get => _database;
 
+#if UNITY_EDITOR
             set => _database = value;
-        }
 #endif
+        }
 
         /*public void Refresh()
         {
