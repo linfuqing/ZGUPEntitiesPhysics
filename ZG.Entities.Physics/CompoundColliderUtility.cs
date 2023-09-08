@@ -19,6 +19,20 @@ namespace ZG
     public static partial class CompoundColliderUtility
     {
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Deterministic)]
+        private struct CreateRightNowJob : IJob
+        {
+            [ReadOnly]
+            public NativeArray<CompoundCollider.ColliderBlobInstance> children;
+
+            public NativeArray<BlobAssetReference<Collider>> result;
+
+            public void Execute()
+            {
+                result[0] = CompoundCollider.Create(children);
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Deterministic)]
         private struct CreateJob : IJob
         {
             public int numColliderKeyBits;
@@ -263,6 +277,19 @@ namespace ZG
             protected override void OnUpdate()
             {
                 throw new global::System.NotImplementedException();
+            }
+        }
+
+        public static BlobAssetReference<Collider> Create(this in NativeArray<CompoundCollider.ColliderBlobInstance> children)
+        {
+            using (var result = new NativeArray<BlobAssetReference<Collider>>(1, Allocator.TempJob))
+            {
+                CreateRightNowJob createRightNowJob;
+                createRightNowJob.children = children;
+                createRightNowJob.result = result;
+                createRightNowJob.Run();
+
+                return result[0];
             }
         }
 

@@ -32,14 +32,20 @@ namespace ZG
         private byte[] __bytes;
 
         [SerializeField, HideInInspector]
+        private int[] __inactiveShapeIndices;
+
+        [SerializeField, HideInInspector]
         private int __colliderCount;
 
         private bool __isInit;
 
-        private BlobAssetReference<Unity.Physics.Collider>[] __colliders;
         private BlobAssetReference<PhysicsHierarchyDefinition> __definition;
+        private BlobAssetReference<Unity.Physics.Collider>[] __colliders;
+        private Dictionary<int, BlobAssetReference<Unity.Physics.Collider>> __shapeColliders;
 
         public IReadOnlyList<BlobAssetReference<Unity.Physics.Collider>> colliders => __colliders;
+
+        public IReadOnlyList<int> inactiveShapeIndices => __inactiveShapeIndices;
 
         public BlobAssetReference<PhysicsHierarchyDefinition> definition
         {
@@ -75,6 +81,14 @@ namespace ZG
 
                 __colliders = null;
             }
+
+            if(__shapeColliders != null)
+            {
+                foreach (var shapeCollider in __shapeColliders)
+                    shapeCollider.Value.Dispose();
+
+                __shapeColliders = null;
+            }
         }
 
         public bool Init()
@@ -98,6 +112,45 @@ namespace ZG
             }
 
             return true;
+        }
+
+        public BlobAssetReference<Unity.Physics.Collider> GetOrCreateCollider(int shapeIndex)
+        {
+            ref var shape = ref __definition.Value.shapes[shapeIndex];
+
+            int numColliders = shape.colliders.Length;
+            if(numColliders < 1)
+            {
+                ref var collider = ref shape.colliders[0];
+                if (collider.transform.Equals(RigidTransform.identity))
+                    return __colliders[collider.index];
+            }
+
+            if (__shapeColliders == null)
+                __shapeColliders = new Dictionary<int, BlobAssetReference<Unity.Physics.Collider>>();
+
+            if (__shapeColliders.TryGetValue(shapeIndex, out var result))
+                return result;
+
+            var colliderBlobInstances = new NativeArray<CompoundCollider.ColliderBlobInstance>(numColliders, Allocator.TempJob);
+
+            CompoundCollider.ColliderBlobInstance colliderBlobInstance;
+            for (int i = 0; i < numColliders; ++i)
+            {
+                ref var collider = ref shape.colliders[i];
+                colliderBlobInstance.Collider = __colliders[collider.index];
+                colliderBlobInstance.CompoundFromChild = collider.transform;
+
+                colliderBlobInstances[i] = colliderBlobInstance;
+            }
+
+            result = CompoundColliderUtility.Create(colliderBlobInstances);
+
+            colliderBlobInstances.Dispose();
+
+            __shapeColliders[shapeIndex] = result;
+
+            return result;
         }
 
         void ISerializationCallbackReceiver.OnAfterDeserialize()
@@ -203,7 +256,8 @@ namespace ZG
                 ref List<UnityEngine.Collider> colliders,
                 ref List<PhysicsShapeAuthoring> shapes,
                 ref List<Shape> shapeResults,
-                ref List<BlobAssetReference<Unity.Physics.Collider>> colliderResults)
+                ref List<BlobAssetReference<Unity.Physics.Collider>> colliderResults, 
+                ref List<int> inactiveShapeIndices)
             {
                 if (colliders == null)
                     colliders = new List<UnityEngine.Collider>();
@@ -219,6 +273,7 @@ namespace ZG
                 if (shapesTemp != null && shapesTemp.Length > 0)
                     shapes.AddRange(shapesTemp);
 
+                int i, inactiveShapeIndex, numShapes;
                 IPhysicsHierarchyShape childShape;
                 List<UnityEngine.Collider> childColliders;
                 List<PhysicsShapeAuthoring> childShapes;
@@ -227,13 +282,14 @@ namespace ZG
                     childShape = child.GetComponent<IPhysicsHierarchyShape>();
                     if (childShape == null)
                     {
+                        inactiveShapeIndex = -1;
+
                         childColliders = colliders;
                         childShapes = shapes;
                     }
                     else
                     {
-                        if (!child.gameObject.activeSelf)
-                            continue;
+                        inactiveShapeIndex = child.gameObject.activeSelf ? -1 : shapeResults.Count;
 
                         childColliders = null;
                         childShapes = null;
@@ -246,7 +302,18 @@ namespace ZG
                         ref childColliders,
                         ref childShapes,
                         ref shapeResults,
-                        ref colliderResults);
+                        ref colliderResults, 
+                        ref inactiveShapeIndices);
+
+                    if(inactiveShapeIndex != -1)
+                    {
+                        if (inactiveShapeIndices == null)
+                            inactiveShapeIndices = new List<int>();
+
+                        numShapes = shapeResults.Count;
+                        for (i = inactiveShapeIndex; i < numShapes; ++i)
+                            inactiveShapeIndices.Add(i);
+                    }
                 }
 
                 if (result != null)
@@ -336,7 +403,7 @@ namespace ZG
                         shapeResult.name = result.name;
                         shapeResult.colliders = new Collider[numColliderBlobInstances];
 
-                        for (int i = 0; i < numColliderBlobInstances; ++i)
+                        for (i = 0; i < numColliderBlobInstances; ++i)
                         {
                             ref var collider = ref shapeResult.colliders[i];
                             ref readonly var colliderBlobInstance = ref colliderBlobInstances.ElementAt(i);
@@ -424,6 +491,7 @@ namespace ZG
             List<PhysicsShapeAuthoring> shapes = null;
             List<Data.Shape> shapeResults = null;
             List<BlobAssetReference<Unity.Physics.Collider>> colliderResults = null;
+            List<int> inactiveShapeIndices = null;
             Data.Create(
                 result,
                 root,
@@ -431,11 +499,14 @@ namespace ZG
                 ref colliders,
                 ref shapes,
                 ref shapeResults,
-                ref colliderResults);
+                ref colliderResults, 
+                ref inactiveShapeIndices);
 
             data.shapes = shapeResults == null ? null : shapeResults.ToArray();
 
             __colliders = colliderResults == null ? null : colliderResults.ToArray();
+
+            __inactiveShapeIndices = inactiveShapeIndices == null ? null : inactiveShapeIndices.ToArray();
 
             __colliderCount = __colliders == null ? 0 : __colliders.Length;
 

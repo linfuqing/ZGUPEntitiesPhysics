@@ -103,6 +103,25 @@ namespace ZG
             collidersBitField.hash = 0;
             collidersBitField.value = BitField.Max;
             assigner.SetComponentData(entity, collidersBitField);
+
+            var inactiveShapeIndices = _database.inactiveShapeIndices;
+            int numInactiveShapeIndices = inactiveShapeIndices == null ? 0 : inactiveShapeIndices.Count;
+            if (numInactiveShapeIndices > 0)
+            {
+                int inactiveShapeIndex;
+                PhysicsHierarchyInactiveTriggers inactiveTriggers;
+                PhysicsHierarchyInactiveColliders inactiveColliders;
+                for(int i = 0; i < numInactiveShapeIndices; ++i)
+                {
+                    inactiveShapeIndex = inactiveShapeIndices[i];
+
+                    inactiveTriggers.shapeIndex = inactiveShapeIndex;
+                    assigner.SetBuffer(true, entity, inactiveTriggers);
+
+                    inactiveColliders.shapeIndex = inactiveShapeIndex;
+                    assigner.SetBuffer(true, entity, inactiveColliders);
+                }
+            }
         }
     }
 }
