@@ -686,7 +686,6 @@ namespace ZG
 #endif
 
         [BurstCompile]
-
         public void OnCreate(ref SystemState state)
         {
             BurstUtility.InitializeJobParallelFor<Init>();
@@ -700,10 +699,10 @@ namespace ZG
             using (var builder = new EntityQueryBuilder(Allocator.Temp))
                 __groupToDisable = builder
                     .WithAll<Disabled>()
-                    .WithAllRW<PhysicsHierarchyTriggersBitField>()
+                    .WithAllRW<PhysicsHierarchyTriggersBitField, PhysicsShapeChildEntity>()
                     .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
                     .Build(ref state);
-            __groupToDisable.SetChangedVersionFilter(ComponentType.ReadOnly<Disabled>());
+            //__groupToDisable.SetChangedVersionFilter(ComponentType.ReadOnly<Disabled>());
 
             using (var builder = new EntityQueryBuilder(Allocator.Temp))
                 __groupToEnable = builder
@@ -783,7 +782,7 @@ namespace ZG
                     disable.shapeChildEntityType = __shapeChildEntityType.UpdateAsRef(ref state);
                     disable.triggerEntitiesToDestroy = __triggerEntitiesToDestroy;
 
-                    disable.Run(__groupToDisable);
+                    disable.RunByRef(__groupToDisable);
                 }
             }
 
@@ -814,7 +813,7 @@ namespace ZG
                     enable.triggerEntitiesToCreate = __triggerEntitiesToCreate;
                     enable.triggerEntitiesToDestroy = __triggerEntitiesToDestroy;
                     enable.values = __values;
-                    enable.Run(__groupToEnable);
+                    enable.RunByRef(__groupToEnable);
 
                     entityManager.DestroyEntity(__triggerEntitiesToDestroy.AsArray());
 
