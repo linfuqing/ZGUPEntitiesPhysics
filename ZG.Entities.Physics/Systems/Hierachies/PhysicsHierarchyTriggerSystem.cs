@@ -738,8 +738,8 @@ namespace ZG
 
 #if ENABLE_PROFILER
             __init = new ProfilerMarker("Physics Triggers Init");
-            __disable = new ProfilerMarker("Physics Triggers Enable");
-            __enable = new ProfilerMarker("Physics Triggers Disable");
+            __disable = new ProfilerMarker("Physics Triggers Disable");
+            __enable = new ProfilerMarker("Physics Triggers Enable");
             __instantiate = new ProfilerMarker("Physics Triggers Instantiate");
 #endif
         }

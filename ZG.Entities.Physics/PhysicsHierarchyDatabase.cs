@@ -428,6 +428,43 @@ namespace ZG
                 }
             }
 
+            public static void Create(
+                Transform root,
+                ref List<UnityEngine.Collider> colliders,
+                ref List<PhysicsShapeAuthoring> shapes,
+                ref List<Shape> shapeResults,
+                ref List<BlobAssetReference<Unity.Physics.Collider>> colliderResults,
+                ref List<int> inactiveShapeIndices)
+            {
+                if (root == null)
+                    return;
+
+                var result = root.GetComponent<IPhysicsHierarchyShape>();
+                if(result == null)
+                {
+                    foreach(Transform child in root)
+                        Create(
+                            child,
+                            ref colliders,
+                            ref shapes,
+                            ref shapeResults,
+                            ref colliderResults,
+                            ref inactiveShapeIndices);
+                }
+                else
+                {
+                    Create(
+                        result,
+                        root,
+                        root,
+                        ref colliders,
+                        ref shapes,
+                        ref shapeResults,
+                        ref colliderResults,
+                        ref inactiveShapeIndices);
+                }
+            }
+
             public BlobAssetReference<PhysicsHierarchyDefinition> ToAsset(int instanceID)
             {
                 using (var blobBuilder = new BlobBuilder(Allocator.Temp))
@@ -483,18 +520,12 @@ namespace ZG
 
         public bool Create()
         {
-            var result = root == null ? null : root.GetComponent<IPhysicsHierarchyShape>();
-            if (result == null)
-                return false;
-
             List<UnityEngine.Collider> colliders = null;
             List<PhysicsShapeAuthoring> shapes = null;
             List<Data.Shape> shapeResults = null;
             List<BlobAssetReference<Unity.Physics.Collider>> colliderResults = null;
             List<int> inactiveShapeIndices = null;
             Data.Create(
-                result,
-                root,
                 root,
                 ref colliders,
                 ref shapes,
