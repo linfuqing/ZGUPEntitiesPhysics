@@ -204,7 +204,7 @@ namespace ZG
                         assigner.SetComponentData(entity, physicsCollider);
 
                         blockReader = reader.ReadBlock(sizes[i]).reader;
-                        blockReader.DeserializeStream(ref assigner, entity);
+                        blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
                     }
 
                     assigner.Playback(ref this.GetState());
@@ -269,7 +269,7 @@ namespace ZG
                     if (i < numSizes)
                     {
                         blockReader = reader.ReadBlock(sizes[i]).reader;
-                        blockReader.DeserializeStream(ref assigner, entity);
+                        blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
                     }
                 }
 
