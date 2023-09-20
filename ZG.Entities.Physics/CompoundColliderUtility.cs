@@ -186,6 +186,8 @@ namespace ZG
                     Rotation rotation;
                     PhysicsCollider physicsCollider;
                     CompoundCollider.ColliderBlobInstance child;
+                    UnsafeBlock.Reader blockReader;
+                    var assigner = new EntityComponentAssigner(Allocator.TempJob);
                     var sizes = reader.ReadArray<int>(numSizes);
                     for (i = 0; i < numSizes; ++i)
                     {
@@ -193,16 +195,23 @@ namespace ZG
                         child = children[i];
 
                         translation.Value = child.CompoundFromChild.pos;
-                        entityManager.SetComponentData(entity, translation);
+                        assigner.SetComponentData(entity, translation);
 
                         rotation.Value = child.CompoundFromChild.rot;
-                        entityManager.SetComponentData(entity, rotation);
+                        assigner.SetComponentData(entity, rotation);
 
                         physicsCollider.Value = child.Collider;
-                        entityManager.SetComponentData(entity, physicsCollider);
+                        assigner.SetComponentData(entity, physicsCollider);
 
-                        reader.ReadBlock(sizes[i]).DeserializeStream(entity, entityManager);
+                        blockReader = reader.ReadBlock(sizes[i]).reader;
+                        blockReader.DeserializeStream(ref assigner, entity);
                     }
+
+                    assigner.Playback(ref this.GetState());
+
+                    CompleteDependency();
+
+                    assigner.Dispose();
                 }
 
                 CreateJob job;
@@ -237,7 +246,9 @@ namespace ZG
                 Translation translation;
                 Rotation rotation;
                 PhysicsCollider physicsCollider;
+                UnsafeBlock.Reader blockReader;
                 var sizes = reader.ReadArray<int>(numSizes);
+                var assigner = new EntityComponentAssigner(Allocator.TempJob);
                 for (int i = 0; i < numColliders; ++i)
                 {
                     entity = entityArray[i];
@@ -247,17 +258,26 @@ namespace ZG
 #endif
 
                     translation.Value = float3.zero;
-                    entityManager.SetComponentData(entity, translation);
+                    assigner.SetComponentData(entity, translation);
 
                     rotation.Value = quaternion.identity;
-                    entityManager.SetComponentData(entity, rotation);
+                    assigner.SetComponentData(entity, rotation);
 
                     physicsCollider.Value = colliders[i];
-                    entityManager.SetComponentData(entity, physicsCollider);
+                    assigner.SetComponentData(entity, physicsCollider);
 
-                    if(i < numSizes)
-                        reader.ReadBlock(sizes[i]).DeserializeStream(entity, entityManager);
+                    if (i < numSizes)
+                    {
+                        blockReader = reader.ReadBlock(sizes[i]).reader;
+                        blockReader.DeserializeStream(ref assigner, entity);
+                    }
                 }
+
+                assigner.Playback(ref this.GetState());
+
+                CompleteDependency();
+
+                assigner.Dispose();
 
                 colliders.Dispose();
 

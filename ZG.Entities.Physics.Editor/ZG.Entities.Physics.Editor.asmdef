@@ -1,5 +1,6 @@
 {
     "name": "ZG.Entities.Physics.Editor",
+    "rootNamespace": "",
     "references": [
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:734d92eba21c94caba915361bd5ac177",
@@ -7,10 +8,11 @@
         "GUID:e00140a815de944528348782854abe39",
         "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:beff58cf91ef5dc4f8939ec84aca2109",
-        "GUID:d1080dc0d8432164aa6d65c2e12ef977",
-        "GUID:bc4c6f1ccba441e4c959d952a01d5dd9",
         "GUID:4ef6fca698a819a45a56658a454d07b6",
-        "GUID:111b9f15fc71a104bb3dac19acd4ca86"
+        "GUID:d1080dc0d8432164aa6d65c2e12ef977",
+        "GUID:111b9f15fc71a104bb3dac19acd4ca86",
+        "GUID:bc4c6f1ccba441e4c959d952a01d5dd9",
+        "GUID:0defcf8d7c19e7b48ab2714ee6ef1fcd"
     ],
     "includePlatforms": [
         "Editor"

@@ -3,6 +3,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Physics;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace ZG
 {
@@ -14,8 +15,6 @@ namespace ZG
     {
         [SerializeField]
         internal PhysicsColliderDatabase _database;
-        [SerializeField]
-        private PhysicsColliders __colliders;
 
         public PhysicsColliderDatabase database
         {
@@ -29,13 +28,20 @@ namespace ZG
                 if (_database == value)
                     return;
 
-                __colliders = null;
-
                 _database = value;
             }
         }
 
-        public CompoundCollider.ColliderBlobInstance mainCollider => __colliders[0];
+        public unsafe CompoundCollider.ColliderBlobInstance mainCollider
+        {
+            get
+            {
+                CompoundCollider.ColliderBlobInstance colliderBlobInstance;
+                colliderBlobInstance.Collider = _database.collider;
+                colliderBlobInstance.CompoundFromChild = RigidTransform.identity;
+                return colliderBlobInstance;
+            }
+        }
 
         public float3 position
         {
@@ -77,6 +83,9 @@ namespace ZG
             }
         }
 
+        [EntityComponents]
+        public System.Type[] componentTypes => _database.componentTypes;
+
         public void Refresh()
         {
 
@@ -84,82 +93,23 @@ namespace ZG
         
         void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
-            if (__colliders == null && _database != null)
-            {
-                var colliderBlobInstances = new Unity.Collections.NativeList<CompoundCollider.ColliderBlobInstance>(Unity.Collections.Allocator.Temp);
+            var transform = base.transform;
 
-                _database.Build(colliderBlobInstances);
+            Translation translation;
+            translation.Value = transform.position;
+            UnityEngine.Assertions.Assert.AreEqual(float3.zero, translation.Value);
+            assigner.SetComponentData(entity, translation);
 
-                __colliders = PhysicsColliders.Create(colliderBlobInstances.AsArray(), true);
+            Rotation rotation;
+            rotation.Value = transform.rotation;
+            UnityEngine.Assertions.Assert.AreEqual(quaternion.identity, rotation.Value);
+            assigner.SetComponentData(entity, rotation);
 
-                colliderBlobInstances.Dispose();
+            PhysicsCollider physicsCollider;
+            physicsCollider.Value = _database.collider;
+            assigner.SetComponentData(entity, physicsCollider);
 
-                _database.Dispose();
-                _database = null;
-            }
-
-            if (__colliders != null)
-            {
-                /*if (!__colliderBlobInstances.IsCreated)
-                    __colliderBlobInstances = new NativeList<CompoundCollider.ColliderBlobInstance>(Allocator.Persistent);
-                else
-                    __colliderBlobInstances.Clear();
-
-                database.Build(__colliderBlobInstances.Add);
-
-                if (__colliderBlobInstances.IsCreated)
-                {
-                    EntityManager entityManager = base.entityManager;
-                    if (entityManager != null && entityManager.IsCreated)
-                    {
-                        Entity entity;
-                        Translation translation;
-                        Rotation rotation;
-                        PhysicsCollider physicsCollider;
-                        foreach (CompoundCollider.ColliderBlobInstance colliderBlobInstance in (NativeArray<CompoundCollider.ColliderBlobInstance>)__colliderBlobInstances)
-                        {
-                            entity = entityManager.CreateEntity(
-                                typeof(Translation),
-                                typeof(Rotation),
-                                typeof(PhysicsCollider));
-
-                            translation.Value = colliderBlobInstance.CompoundFromChild.pos;
-                            entityManager.SetComponentData(entity, translation);
-
-                            rotation.Value = colliderBlobInstance.CompoundFromChild.rot;
-                            entityManager.SetComponentData(entity, rotation);
-
-                            physicsCollider.Value = colliderBlobInstance.Collider;
-                            entityManager.SetComponentData(entity, physicsCollider);
-
-                            entityManager.AddComponentObject(entity, transform);
-
-                            if (!__entities.IsCreated)
-                                __entities = new NativeList<Entity>(Allocator.Persistent);
-
-                            __entities.Add(entity);
-                        }
-                    }
-                }*/
-
-                var transform = base.transform;
-
-                Translation translation;
-                translation.Value = transform.position;
-                UnityEngine.Assertions.Assert.AreEqual(float3.zero, translation.Value);
-                assigner.SetComponentData(entity, translation);
-
-                Rotation rotation;
-                rotation.Value = transform.rotation;
-                UnityEngine.Assertions.Assert.AreEqual(quaternion.identity, rotation.Value);
-                assigner.SetComponentData(entity, rotation);
-
-                PhysicsCollider physicsCollider;
-                physicsCollider.Value = __colliders.value;
-                assigner.SetComponentData(entity, physicsCollider);
-
-                //Debug.Log($"Physics Init {name} In {world.GetExistingSystem<FrameSyncSystemGroup>().frameIndex}");
-            }
+            _database.Init(entity, ref assigner);
         }
 
         /*protected void OnDisable()

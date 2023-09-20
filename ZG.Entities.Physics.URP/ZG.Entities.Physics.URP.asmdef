@@ -1,5 +1,5 @@
 {
-    "name": "ZG.Entities.Physics",
+    "name": "ZG.Entities.Physics.URP",
     "rootNamespace": "",
     "references": [
         "Unity.Entities",
@@ -10,11 +10,16 @@
         "Unity.Mathematics",
         "Unity.Transforms",
         "Unity.Physics",
+        "Unity.Physics.Hybrid",
         "Havok.Physics",
         "ZG",
         "ZG.Collections",
         "ZG.Mathematics",
-        "ZG.Entities"
+        "ZG.Entities",
+        "ZG.Entities.Physics",
+        "ZG.Entities.Physics.Authoring",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

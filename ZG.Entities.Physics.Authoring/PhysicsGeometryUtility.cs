@@ -1,12 +1,12 @@
 ﻿using System;
 using Unity.Burst;
 using Unity.Jobs;
+using Unity.Entities;
 using Unity.Collections;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Authoring;
 using Math = Unity.Physics.Math;
-using Unity.Entities;
 
 namespace ZG
 {

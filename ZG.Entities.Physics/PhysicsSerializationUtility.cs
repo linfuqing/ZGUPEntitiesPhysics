@@ -135,7 +135,7 @@ namespace ZG
 
         public static unsafe void SerializeColliders(
                this ref NativeBuffer.Writer writer,
-               NativeArray<BlobAssetReference<Collider>> colliders)
+               in NativeArray<BlobAssetReference<Collider>> colliders)
         {
             int count = colliders.IsCreated ? colliders.Length : 0;
             writer.Write(count);
@@ -329,9 +329,9 @@ namespace ZG
             }
         }
 
-        public unsafe static void Deserialize(
-            this ref NativeBuffer.Reader reader,
-            ref NativeList<BlobAssetReference<Collider>> colliderBlobInstances)
+        public unsafe static void Deserialize<T>(
+            this ref T reader,
+            ref NativeList<BlobAssetReference<Collider>> colliderBlobInstances) where T : struct, IUnsafeReader
         {
             int count = reader.Read<int>(), length;
             //using (var temp = new MemoryBinaryReader(ref reader))
@@ -346,9 +346,9 @@ namespace ZG
             }
         }
 
-        public static void Deserialize(
-            this ref NativeBuffer.Reader reader,
-            ref NativeList<CompoundCollider.ColliderBlobInstance> colliderBlobInstances)
+        public static void Deserialize<T>(
+            this ref T reader,
+            ref NativeList<CompoundCollider.ColliderBlobInstance> colliderBlobInstances) where T : struct, IUnsafeReader
         {
             int index = reader.Read<int>();
             var transforms = new NativeParallelHashMap<int, RigidTransform>(1, Allocator.Temp);

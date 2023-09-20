@@ -251,7 +251,7 @@ namespace ZG
             NativeList<CompoundCollider.ColliderBlobInstance> outputs,
             Transform root,
             Unity.Physics.Material material,
-            CollisionFilter filter,
+            in CollisionFilter filter,
             float convexRadius, 
             int startIndex,
             int count, 
@@ -266,8 +266,10 @@ namespace ZG
 
             using (var hierarchy = new NativeList<EntityTransform>(Allocator.TempJob))
             {
+                CollisionFilter collisionFilter;
                 UnityEngine.Collider input;
-                for(int i = 0; i < count; ++i)
+                PhysicsGroup physicsGroup;
+                for (int i = 0; i < count; ++i)
                 {
                     input = inputs[i + startIndex];
 
@@ -282,11 +284,16 @@ namespace ZG
 
                     try
                     {
+                        collisionFilter = filter;
+                        physicsGroup = input.GetComponent<PhysicsGroup>();
+                        if(physicsGroup != null)
+                            collisionFilter.GroupIndex = physicsGroup.index;
+
                         Convert(
                             input,
                             isBaked,
                             convexRadius,
-                            filter,
+                            collisionFilter,
                             material,
                             hierarchy.AsArray(),
                             outputs);

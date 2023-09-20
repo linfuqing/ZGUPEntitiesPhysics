@@ -7,6 +7,9 @@ using Unity.Entities;
 using Unity.Physics;
 using UnityEngine;
 using ZG.Mathematics;
+using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine.UIElements;
+using FNSDK;
 
 namespace ZG
 {
@@ -105,19 +108,24 @@ namespace ZG
         }
     }
 
-    public class PhysicsColliderDatabase : ScriptableObject, IDisposable
+    public class PhysicsColliderDatabase : ScriptableObject, ISerializationCallbackReceiver
     {
         public enum SerializatedType
         {
             Normal,
-            Identity
+            Identity, 
+            Stream
         }
 
         [HideInInspector, SerializeField]
         internal SerializatedType _serializatedType;
         [HideInInspector, SerializeField, UnityEngine.Serialization.FormerlySerializedAs("__bytes")]
         internal byte[] _bytes;
-        
+
+        private BlobAssetReference<Unity.Physics.Collider> __collider;
+
+        public BlobAssetReference<Unity.Physics.Collider> collider => __collider;
+
         public static PhysicsColliderDatabase Create(IEnumerable<CompoundCollider.ColliderBlobInstance> colliderBlobInstances)
         {
             PhysicsColliderDatabase result = CreateInstance<PhysicsColliderDatabase>();
@@ -157,53 +165,149 @@ namespace ZG
             return Create((ICollection<BlobAssetReference<Unity.Physics.Collider>>)colliders);
         }
 
-        public void Build(NativeList<CompoundCollider.ColliderBlobInstance> colliderBlobInstances)
+        public unsafe Type[] componentTypes
         {
-            using (BinaryReader reader = new BinaryReader(new MemoryStream(_bytes)))
+            get
             {
+                if (_serializatedType != SerializatedType.Stream)
+                    ((ISerializationCallbackReceiver)this).OnAfterDeserialize();
+
+                if (_serializatedType != SerializatedType.Stream || _bytes == null)
+                    return null;
+
+                int length = _bytes.Length;
+                fixed (void* ptr = _bytes)
+                {
+                    var appendBuffer = new UnsafeAppendBuffer(ptr, length); 
+                    appendBuffer.Length = length;
+                    var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
+                    var reader = buffer.reader;
+
+                    var componentTypes = new NativeList<ComponentType>(Allocator.Temp);
+                    reader.DeserializeStream(ref componentTypes);
+
+                    int numComponentTypes = componentTypes.Length;
+                    if (numComponentTypes > 0)
+                    {
+                        Type[] types = new Type[numComponentTypes];
+
+                        for (int i = 0; i < numComponentTypes; ++i)
+                            types[i] = TypeManager.GetType(componentTypes[i].TypeIndex);
+
+                        return types;
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        public unsafe void Init(in Entity entity, ref EntityComponentAssigner assigner)
+        {
+            if (_serializatedType != SerializatedType.Stream)
+                ((ISerializationCallbackReceiver)this).OnAfterDeserialize();
+
+            if (_serializatedType != SerializatedType.Stream || _bytes == null)
+                return;
+
+            int length = _bytes.Length;
+            fixed (void* ptr = _bytes)
+            {
+                var appendBuffer = new UnsafeAppendBuffer(ptr, length);
+                var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
+                var reader = buffer.reader;
+
+                reader.DeserializeStream(ref assigner, entity);
+            }
+        }
+
+        void ISerializationCallbackReceiver.OnBeforeSerialize()
+        {
+            if (!__collider.IsCreated && _serializatedType != SerializatedType.Stream)
+                return;
+
+            using (var buffer = new NativeBuffer(Allocator.Temp, 1))
+            {
+                using (var colliders = new NativeList<BlobAssetReference<Unity.Physics.Collider>>(Allocator.Temp)
+                {
+                    __collider
+                })
+                {
+                    var writer = buffer.writer;
+                    writer.SerializeColliders(colliders.AsArray());
+
+                    if (_bytes != null)
+                        writer.Write(_bytes);
+                }
+
+                _bytes = buffer.ToBytes();
+            }
+            _serializatedType = SerializatedType.Identity;
+        }
+
+        unsafe void ISerializationCallbackReceiver.OnAfterDeserialize()
+        {
+            if (_bytes == null)
+                return;
+
+            if (_serializatedType != SerializatedType.Stream)
+            {
+                if (__collider.IsCreated)
+                    __collider.Dispose();
+            }
+
+            int length = _bytes.Length;
+            fixed (void* ptr = _bytes)
+            {
+                var appendBuffer = new UnsafeAppendBuffer(ptr, length);
+                appendBuffer.Length = length;
+                var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
+
+                var reader = buffer.reader;
+                var colliderBlobInstances = new NativeList<CompoundCollider.ColliderBlobInstance>(Allocator.Temp);
                 switch (_serializatedType)
                 {
                     case SerializatedType.Normal:
                         reader.Deserialize(ref colliderBlobInstances);
                         break;
                     case SerializatedType.Identity:
-                        reader.Deserialize((BlobAssetReference<Unity.Physics.Collider> collider) =>
+                        var colliders = new NativeList<BlobAssetReference<Unity.Physics.Collider>>(Allocator.Temp);
+                        reader.Deserialize(ref colliders);
+
+                        CompoundCollider.ColliderBlobInstance colliderBlobInstance;
+                        foreach (var collider in colliders)
                         {
-                            CompoundCollider.ColliderBlobInstance colliderBlobInstance;
                             colliderBlobInstance.Collider = collider;
                             colliderBlobInstance.CompoundFromChild = RigidTransform.identity;
                             colliderBlobInstances.Add(colliderBlobInstance);
-                        });
+                        }
+
+                        colliders.Dispose();
                         break;
                 }
-            }
-        }
 
-        public void Build(Action<CompoundCollider.ColliderBlobInstance> colliderBlobInstances)
-        {
-            using (BinaryReader reader = new BinaryReader(new MemoryStream(_bytes)))
-            {
-                switch(_serializatedType)
+                if (!colliderBlobInstances.IsEmpty)
                 {
-                    case SerializatedType.Normal:
-                        reader.Deserialize(colliderBlobInstances);
-                        break;
-                    case SerializatedType.Identity:
-                        reader.Deserialize((BlobAssetReference<Unity.Physics.Collider> collider) =>
-                        {
-                            CompoundCollider.ColliderBlobInstance colliderBlobInstance;
-                            colliderBlobInstance.Collider = collider;
-                            colliderBlobInstance.CompoundFromChild = RigidTransform.identity;
-                            colliderBlobInstances.Invoke(colliderBlobInstance);
-                        });
-                        break;
-                }
-            }
-        }
+                    __collider = CompoundCollider.Create(colliderBlobInstances.AsArray());
 
-        public void Dispose()
-        {
-            _bytes = null;
+                    foreach (var colliderBlobInstance in colliderBlobInstances)
+                        colliderBlobInstance.Collider.Dispose();
+                }
+
+                colliderBlobInstances.Dispose();
+
+                _serializatedType = SerializatedType.Stream;
+
+                length -= reader.position;
+                if(length > 0)
+                    UnsafeUtility.MemMove(ptr, reader.Read(length), length);
+                //reader.DeserializeStream(__entity, ref entityManager);
+            }
+
+            if (length > 0)
+                Array.Resize(ref _bytes, length);
+            else
+                _bytes = null;
         }
     }
 }

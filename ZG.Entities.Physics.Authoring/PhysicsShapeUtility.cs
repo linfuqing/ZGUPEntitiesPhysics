@@ -321,7 +321,6 @@ namespace ZG
                     if (isShowProgressBar && UnityEditor.EditorUtility.DisplayCancelableProgressBar("Convert Shapes", input.name + '(' + i + '/' + count + ')', i * 1.0f / count))
                         break;
 #endif
-
                     hierarchy.Clear();
                     input.transform.GetHierarchy(root, hierarchy);
 

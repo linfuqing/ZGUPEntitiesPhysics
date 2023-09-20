@@ -86,7 +86,7 @@ namespace ZG
             }
         }
 
-        public struct CharacterControllerAllHitsCollector<T> : ICollector<T> where T : unmanaged, IQueryResult
+        /*public struct CharacterControllerAllHitsCollector<T> : ICollector<T> where T : unmanaged, IQueryResult
         {
             private int m_selfRBIndex;
 
@@ -119,7 +119,7 @@ namespace ZG
 
             #endregion
 
-        }
+        }*/
 
         // A collector which stores only the closest hit different from itself, the triggers, and predefined list of values it hit.
         public struct CharacterControllerClosestHitCollector<T> : ICollector<T> where T : struct, IQueryResult
@@ -361,6 +361,9 @@ namespace ZG
             var distanceHits = new NativeList<DistanceHit>(math.max(k_DefaultQueryHitsCapacity, stepInput.distanceHits.Length), Allocator.Temp);
             var castHits = new NativeList<ColliderCastHit>(k_DefaultQueryHitsCapacity, Allocator.Temp);
 
+            NativeListWriteOnlyWrapper<ColliderCastHit> colliderCastWrapper;
+            NativeListWriteOnlyWrapper<DistanceHit> distanceWrapper;
+
             const float timeEpsilon = 0.000001f;
             for (int i = 0; i < maxIterations && remainingTime > timeEpsilon; i++)
             {
@@ -372,7 +375,12 @@ namespace ZG
 
                     castHits.Clear();
 
-                    var collector = new CharacterControllerAllHitsCollector<ColliderCastHit>(stepInput.rigidbodyIndex, 1.0f, ref castHits);
+                    var collector = new ListCollectorExclude<ColliderCastHit, NativeList<ColliderCastHit>, NativeListWriteOnlyWrapper<ColliderCastHit>>(
+                        stepInput.rigidbodyIndex, 
+                        1.0f, 
+                        //rigidbodies, 
+                        ref castHits, 
+                        ref colliderCastWrapper);
                     var input = new ColliderCastInput()
                     {
                         Collider = Collider,
@@ -388,7 +396,7 @@ namespace ZG
                     // Iterate over hits and create constraints from them
                     for (int hitIndex = 0; hitIndex < collector.NumHits; hitIndex++)
                     {
-                        var hit = collector.AllHits[hitIndex];
+                        var hit = collector.hits[hitIndex];
                         /*if ((rigidbodies[hit.RigidBodyIndex].Collider.Value.GetLeafFilter(hit.ColliderKey).BelongsTo & belongsTo) == 0)
                             continue;*/
 
@@ -417,8 +425,11 @@ namespace ZG
                     {
                         distanceHits.Clear();
 
-                        CharacterControllerAllHitsCollector<DistanceHit> distanceHitsCollector = new CharacterControllerAllHitsCollector<DistanceHit>(
-                            stepInput.rigidbodyIndex, stepInput.contactTolerance, ref distanceHits);
+                        var distanceHitsCollector = new ListCollectorExclude<DistanceHit, NativeList<DistanceHit>, NativeListWriteOnlyWrapper<DistanceHit>>(
+                            stepInput.rigidbodyIndex, 
+                            stepInput.contactTolerance, 
+                            ref distanceHits, 
+                            ref distanceWrapper);
                         {
                             ColliderDistanceInput input = new ColliderDistanceInput()
                             {

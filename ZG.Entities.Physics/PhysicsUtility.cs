@@ -1,4 +1,5 @@
 ﻿using Unity.Collections.LowLevel.Unsafe;
+using Unity.Collections;
 using Unity.Mathematics;
 using Unity.Physics;
 
@@ -120,33 +121,50 @@ namespace ZG
         #endregion
     }
 
-    public struct DynamicBufferCollectorExclude<T> : ICollector<T> where T : unmanaged, IQueryResult
+    public struct ListCollectorExclude<THit, TList, TWrapper> : ICollector<THit> 
+        where THit : unmanaged, IQueryResult
+        where TWrapper : unmanaged, IWriteOnlyListWrapper<THit, TList>
     {
-        private int __maskIndex;
+        private int __maskRigidbodyIndex;
+        //private NativeArray<RigidBody> __rigidbodies;
 
-        public bool EarlyOutOnFirstHit => false;
+        public readonly bool EarlyOutOnFirstHit => false;
 
-        public int NumHits => hits.Length;
+        public readonly int NumHits => wrapper.GetCount(hits);
 
-        public float MaxFraction { get; }
+        public readonly float MaxFraction { get; }
 
-        public Unity.Entities.DynamicBuffer<T> hits;
+        public TList hits;
 
-        public DynamicBufferCollectorExclude(int maskIndex, float maxFraction, in Unity.Entities.DynamicBuffer<T> hits)
+        public TWrapper wrapper;
+
+        public ListCollectorExclude(
+            int maskRigidbodyIndex,
+            float maxFraction,
+            //in NativeArray<RigidBody> rigidbodies,
+            ref TList hits, 
+            ref TWrapper wrapper)
         {
             MaxFraction = maxFraction;
-            __maskIndex = maskIndex;
+            __maskRigidbodyIndex = maskRigidbodyIndex;
+            //__rigidbodies = rigidbodies;
             this.hits = hits;
+            this.wrapper = wrapper;
         }
 
         #region IQueryResult implementation
 
-        public bool AddHit(T hit)
+        public unsafe bool AddHit(THit hit)
         {
-            if (hit.RigidBodyIndex == __maskIndex)
+            if (hit.RigidBodyIndex == __maskRigidbodyIndex)
                 return false;
 
-            hits.Add(hit);
+            /*if (!__rigidbodies[hit.RigidBodyIndex].Collider.Value.GetLeaf(hit.ColliderKey, out var leaf) || PhysicsUtility.IsTrigger(ref *leaf.Collider))
+                return false;*/
+
+            int index = wrapper.GetCount(hits);
+            wrapper.SetCount(ref hits, index + 1);
+            wrapper.Set(ref hits, hit, index);
             
             return true;
         }
