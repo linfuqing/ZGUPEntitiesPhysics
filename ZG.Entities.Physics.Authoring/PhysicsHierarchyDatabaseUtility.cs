@@ -249,6 +249,6 @@ namespace ZG
             database.Create(colliderResults == null ? null : colliderResults.ToArray(),
                 inactiveShapeIndices == null ? null : inactiveShapeIndices.ToArray());
         }
-    }
 #endif
+    }
 }

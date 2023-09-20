@@ -301,17 +301,15 @@ namespace ZG
         [HideInInspector]
         public Transform root;
 
-        public bool Create(
-            BlobAssetReference<Unity.Physics.Collider>[] colliderResults = null,
-            int[] inactiveShapeIndices = null)
+        public void Create(
+            BlobAssetReference<Unity.Physics.Collider>[] colliderResults,
+            int[] inactiveShapeIndices)
         {
             __inactiveShapeIndices = inactiveShapeIndices;
 
             __colliders =  colliderResults;
 
             __colliderCount = __colliders == null ? 0 : __colliders.Length;
-
-            return true;
         }
 
         public void Rebuild()
