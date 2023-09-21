@@ -285,7 +285,7 @@ namespace ZG
                     var writer = buffer.writer;
 
                     if (colliderBlobInstances.Length > 0)
-                        writer.Serialize(colliderBlobInstances.AsArray(), serializers);
+                        writer.SerializeColliderBlobInstances(colliderBlobInstances.AsArray(), serializers);
 
                     using (var stream = File.Create(path))
                     {

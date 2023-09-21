@@ -126,43 +126,46 @@ namespace ZG
 
         public BlobAssetReference<Unity.Physics.Collider> collider => __collider;
 
-        public static PhysicsColliderDatabase Create(IEnumerable<CompoundCollider.ColliderBlobInstance> colliderBlobInstances)
+        public static PhysicsColliderDatabase Create(in NativeArray<CompoundCollider.ColliderBlobInstance> colliderBlobInstances, IDictionary<int, IEntityDataStreamSerializer> serializers)
         {
             PhysicsColliderDatabase result = CreateInstance<PhysicsColliderDatabase>();
 
             result._serializatedType = SerializatedType.Normal;
 
-            using (MemoryStream memoryStream = new MemoryStream())
+            using (var buffer = new NativeBuffer(Allocator.Temp, 1))
             {
-                BinaryWriter writer = new BinaryWriter(memoryStream);
-                writer.SerializeColliderBlobInstances(colliderBlobInstances);
+                var writer = buffer.writer;
+                writer.SerializeColliderBlobInstances(colliderBlobInstances, serializers);
 
-                result._bytes = memoryStream.ToArray();
+                result._bytes = buffer.ToBytes();
             }
 
             return result;
         }
 
-        public static PhysicsColliderDatabase Create(ICollection<BlobAssetReference<Unity.Physics.Collider>> colliders)
+        public static PhysicsColliderDatabase Create(in NativeArray<BlobAssetReference<Unity.Physics.Collider>> colliders, IDictionary<int, IEntityDataStreamSerializer> serializers)
         {
             PhysicsColliderDatabase result = CreateInstance<PhysicsColliderDatabase>();
 
             result._serializatedType = SerializatedType.Identity;
 
-            using (MemoryStream memoryStream = new MemoryStream())
+            using (var buffer = new NativeBuffer(Allocator.Temp, 1))
             {
-                BinaryWriter writer = new BinaryWriter(memoryStream);
-                writer.SerializeColliders(colliders);
+                var writer = buffer.writer;
+                writer.SerializeColliders(colliders, serializers);
 
-                result._bytes = memoryStream.ToArray();
+                result._bytes = buffer.ToBytes();
             }
 
             return result;
         }
 
-        public static PhysicsColliderDatabase Create(params BlobAssetReference<Unity.Physics.Collider>[] colliders)
+        public static unsafe PhysicsColliderDatabase Create(IDictionary<int, IEntityDataStreamSerializer> serializers, params BlobAssetReference<Unity.Physics.Collider>[] colliders)
         {
-            return Create((ICollection<BlobAssetReference<Unity.Physics.Collider>>)colliders);
+            fixed (void* ptr = colliders)
+            {
+                return Create(CollectionHelper.ConvertExistingDataToNativeArray<BlobAssetReference<Unity.Physics.Collider>>(ptr, colliders.Length, Allocator.None, true), serializers);
+            }
         }
 
         public unsafe Type[] componentTypes

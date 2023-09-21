@@ -335,7 +335,7 @@ namespace ZG
             return world.GetOrCreateSystemManaged<System>().Deserialize(ref reader, allocator);
         }
 
-        public static void Serialize(
+        public static void SerializeSerializers(
             this ref NativeBuffer.Writer writer, 
             ICollection<IEntityDataStreamSerializer> serializers)
         {
@@ -357,10 +357,10 @@ namespace ZG
             }
         }
 
-        public static void Serialize(
+        public static void SerializeColliderBlobInstances(
             this ref NativeBuffer.Writer writer, 
             in NativeArray<CompoundCollider.ColliderBlobInstance> source, 
-            Dictionary<int, IEntityDataStreamSerializer> serializers)
+            IDictionary<int, IEntityDataStreamSerializer> serializers)
         {
             int numSerializers = serializers == null ? 0 : serializers.Count;
             if (numSerializers > 0)
@@ -387,7 +387,7 @@ namespace ZG
 
                 writer.SerializeColliderBlobInstances(destination);
 
-                Serialize(ref writer, serializers.Values);
+                SerializeSerializers(ref writer, serializers.Values);
 
                 destination.Dispose();
             }
@@ -396,10 +396,10 @@ namespace ZG
 
         }
 
-        public static void Serialize(
+        public static void SerializeColliders(
             this ref NativeBuffer.Writer writer,
             in NativeArray<BlobAssetReference<Collider>> source,
-            Dictionary<int, IEntityDataStreamSerializer> serializers)
+            IDictionary<int, IEntityDataStreamSerializer> serializers)
         {
             int numSerializers = serializers == null ? 0 : serializers.Count;
             if (numSerializers > 0)
@@ -426,7 +426,7 @@ namespace ZG
 
                 writer.SerializeColliders(destination);
 
-                Serialize(ref writer, serializers.Values);
+                SerializeSerializers(ref writer, serializers.Values);
 
                 destination.Dispose();
             }
