@@ -229,6 +229,7 @@ namespace ZG
             fixed (void* ptr = _bytes)
             {
                 var appendBuffer = new UnsafeAppendBuffer(ptr, length);
+                appendBuffer.Length = length;
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
@@ -239,7 +240,7 @@ namespace ZG
                 {
                     blockReader = reader.ReadBlock(size).reader;
 
-                    reader.DeserializeStream(ref assigner, entity);
+                    blockReader.DeserializeStream(ref assigner, entity);
                 }
             }
         }
