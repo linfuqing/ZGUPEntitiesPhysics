@@ -187,7 +187,15 @@ namespace ZG
                     var reader = buffer.reader;
 
                     var componentTypes = new NativeList<ComponentType>(Allocator.Temp);
-                    reader.DeserializeStream(ref componentTypes);
+
+                    var sizes = reader.ReadArray<int>(reader.Read<int>());
+
+                    UnsafeBlock.Reader blockReader;
+                    foreach (var size in sizes)
+                    {
+                        blockReader = reader.ReadBlock(size).reader;
+                        blockReader.DeserializeStream(ref componentTypes);
+                    }
 
                     int numComponentTypes = componentTypes.Length;
                     if (numComponentTypes > 0)
@@ -197,8 +205,12 @@ namespace ZG
                         for (int i = 0; i < numComponentTypes; ++i)
                             types[i] = TypeManager.GetType(componentTypes[i].TypeIndex);
 
+                        componentTypes.Dispose();
+
                         return types;
                     }
+
+                    componentTypes.Dispose();
                 }
 
                 return null;
@@ -220,13 +232,21 @@ namespace ZG
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
-                reader.DeserializeStream(ref assigner, entity);
+                var sizes = reader.ReadArray<int>(reader.Read<int>());
+
+                UnsafeBlock.Reader blockReader;
+                foreach (var size in sizes)
+                {
+                    blockReader = reader.ReadBlock(size).reader;
+
+                    reader.DeserializeStream(ref assigner, entity);
+                }
             }
         }
 
         void ISerializationCallbackReceiver.OnBeforeSerialize()
         {
-            if (!__collider.IsCreated && _serializatedType != SerializatedType.Stream)
+            if (!__collider.IsCreated || _serializatedType != SerializatedType.Stream)
                 return;
 
             using (var buffer = new NativeBuffer(Allocator.Temp, 1))
@@ -289,7 +309,9 @@ namespace ZG
                         break;
                 }
 
-                if (!colliderBlobInstances.IsEmpty)
+                if (colliderBlobInstances.Length == 1 && colliderBlobInstances[0].CompoundFromChild.Equals(RigidTransform.identity))
+                    __collider = colliderBlobInstances[0].Collider;
+                else if (!colliderBlobInstances.IsEmpty)
                 {
                     __collider = CompoundCollider.Create(colliderBlobInstances.AsArray());
 
@@ -299,12 +321,16 @@ namespace ZG
 
                 colliderBlobInstances.Dispose();
 
-                _serializatedType = SerializatedType.Stream;
+                if (_serializatedType != SerializatedType.Stream)
+                {
+                    _serializatedType = SerializatedType.Stream;
 
-                length -= reader.position;
-                if(length > 0)
-                    UnsafeUtility.MemMove(ptr, reader.Read(length), length);
-                //reader.DeserializeStream(__entity, ref entityManager);
+                    length -= reader.position;
+                    if (length > 0)
+                        UnsafeUtility.MemMove(ptr, reader.Read(length), length);
+
+                    //reader.DeserializeStream(__entity, ref entityManager);
+                }
             }
 
             if (length > 0)
