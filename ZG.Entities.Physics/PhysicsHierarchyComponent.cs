@@ -116,10 +116,10 @@ namespace ZG
                     inactiveShapeIndex = inactiveShapeIndices[i];
 
                     inactiveTriggers.shapeIndex = inactiveShapeIndex;
-                    assigner.SetBuffer(true, entity, inactiveTriggers);
+                    assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveTriggers);
 
                     inactiveColliders.shapeIndex = inactiveShapeIndex;
-                    assigner.SetBuffer(true, entity, inactiveColliders);
+                    assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveColliders);
                 }
             }
         }

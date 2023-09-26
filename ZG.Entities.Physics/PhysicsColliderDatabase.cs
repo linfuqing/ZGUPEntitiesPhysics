@@ -222,7 +222,7 @@ namespace ZG
             if (_serializatedType != SerializatedType.Stream)
                 ((ISerializationCallbackReceiver)this).OnAfterDeserialize();
 
-            if (_serializatedType != SerializatedType.Stream || _bytes == null)
+            if (_serializatedType != SerializatedType.Stream || _bytes == null || _bytes.Length < 1)
                 return;
 
             int length = _bytes.Length;
@@ -271,7 +271,7 @@ namespace ZG
 
         unsafe void ISerializationCallbackReceiver.OnAfterDeserialize()
         {
-            if (_bytes == null)
+            if (_bytes == null || _bytes.Length < 1)
                 return;
 
             if (_serializatedType != SerializatedType.Stream)
