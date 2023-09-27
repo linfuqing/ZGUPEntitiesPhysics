@@ -521,59 +521,40 @@ namespace ZG
                                 for (j = 0; j < numColliders; ++j)
                                 {
                                     ref var collider = ref shape.colliders[j];
-                                    ref var trigger = ref shape.triggers[triggerIndex];
 
                                     handle.index = collider.index;
-                                    if (trigger.index == j)
+
+                                    if (triggerIndex < numTriggers)
                                     {
-                                        child.flag = 0;
-                                        /*if ((trigger.flag & PhysicsHierarchyTriggerFlag.Disabled) == PhysicsHierarchyTriggerFlag.Disabled)
-                                            child.flag |= PhysicsShapeChild.Flag.ColliderDisabled;*/
+                                        ref var trigger = ref shape.triggers[triggerIndex];
+                                        if (trigger.index == j)
+                                        {
+                                            child.flag = 0;
 
-                                        child.childIndex = childIndex++;
-                                        child.triggerIndex = triggerIndex++;
-                                        child.shapeIndex = i;
-                                        child.contactTolerance = trigger.contactTolerance;
-                                        child.tag = trigger.tag;
-                                        child.transform = collider.transform;
+                                            child.childIndex = childIndex++;
+                                            child.triggerIndex = triggerIndex++;
+                                            child.shapeIndex = i;
+                                            child.contactTolerance = trigger.contactTolerance;
+                                            child.tag = trigger.tag;
+                                            child.transform = collider.transform;
 
-                                        child.collider = colliders[handle];
-                                        children.Insert(nextChildIndex, child);
+                                            child.collider = colliders[handle];
+                                            children.Insert(nextChildIndex, child);
 
-                                        childEntity.value = triggerEntityArray[triggerEntityOffset];
-                                        childEntities.Insert(nextChildIndex, childEntity);
+                                            childEntity.value = triggerEntityArray[triggerEntityOffset];
+                                            childEntities.Insert(nextChildIndex, childEntity);
 
-                                        parent.index = nextChildIndex;
-                                        parent.entity = value.entity;
-                                        parents[childEntity.value] = parent;
+                                            parent.index = nextChildIndex;
+                                            parent.entity = value.entity;
+                                            parents[childEntity.value] = parent;
 
-                                        triggerEntityOffset += numTriggerEntities;
+                                            triggerEntityOffset += numTriggerEntities;
 
-                                        ++nextChildIndex;
+                                            ++nextChildIndex;
+                                        }
                                     }
-                                    /*else
-                                    {
-                                        hash ^= collider.hash;
-
-                                        colliderBlobInstance.CompoundFromChild = collider.transform;
-                                        colliderBlobInstance.Collider = colliders[handle];
-                                        colliderBlobInstances.Add(colliderBlobInstance);
-                                    }*/
                                 }
                             }
-                            /*else
-                            {
-                                for (j = 0; j < numColliders; ++j)
-                                {
-                                    ref var collider = ref shape.colliders[j];
-
-                                    handle.index = collider.index;
-
-                                    colliderBlobInstance.CompoundFromChild = collider.transform;
-                                    colliderBlobInstance.Collider = colliders[handle];
-                                    colliderBlobInstances.Add(colliderBlobInstance);
-                                }
-                            }*/
                         }
                         else
                         {

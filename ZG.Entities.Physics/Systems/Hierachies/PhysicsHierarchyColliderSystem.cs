@@ -92,12 +92,19 @@ namespace ZG
                         triggerIndex = 0;
                         for (j = 0; j < numColliders; ++j)
                         {
-                            ref var trigger = ref shape.triggers[triggerIndex];
+                            if (triggerIndex < numTriggers)
+                            {
+                                ref var trigger = ref shape.triggers[triggerIndex];
 
-                            if (trigger.index == j)
-                                ++triggerIndex;
-                            else
-                                hash ^= shape.colliders[j].hash;
+                                if (trigger.index == j)
+                                {
+                                    ++triggerIndex;
+
+                                    continue;
+                                }
+                            }
+
+                            hash ^= shape.colliders[j].hash;
                         }
 
                         numColliders -= numTriggers;
@@ -304,6 +311,19 @@ namespace ZG
         }
 
         private EntityQuery __group;
+
+        private ComponentTypeHandle<PhysicsHierarchyData> __instanceType;
+
+        private BufferTypeHandle<PhysicsHierarchyInactiveColliders> __inactiveCollidersType;
+
+        private BufferTypeHandle<PhysicsShapeDestroiedCollider> __destroiedColliderType;
+
+        private ComponentTypeHandle<PhysicsShapeCompoundCollider> __compoundColliderType;
+
+        private ComponentTypeHandle<PhysicsCollider> __resultType;
+
+        private ComponentTypeHandle<PhysicsHierarchyCollidersBitField> __bitFieldType;
+
         private SingletonAssetContainer<BlobAssetReference<Collider>> __colliders;
 
         public PhysicsHierarchyColliderSystemCore(ref SystemState state)
@@ -317,6 +337,13 @@ namespace ZG
 
             __group.SetChangedVersionFilter(ComponentType.ReadOnly<PhysicsHierarchyInactiveColliders>());
 
+            __instanceType = state.GetComponentTypeHandle<PhysicsHierarchyData>(true);
+            __inactiveCollidersType = state.GetBufferTypeHandle<PhysicsHierarchyInactiveColliders>(true);
+            __destroiedColliderType = state.GetBufferTypeHandle<PhysicsShapeDestroiedCollider>();
+            __compoundColliderType = state.GetComponentTypeHandle<PhysicsShapeCompoundCollider>();
+            __resultType = state.GetComponentTypeHandle<PhysicsCollider>();
+            __bitFieldType = state.GetComponentTypeHandle<PhysicsHierarchyCollidersBitField>();
+
             __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.Retain();
         }
 
@@ -329,14 +356,14 @@ namespace ZG
         {
             ChangeEx change;
             change.colliders = __colliders.reader;
-            change.instanceType = state.GetComponentTypeHandle<PhysicsHierarchyData>(true);
-            change.inactiveCollidersType = state.GetBufferTypeHandle<PhysicsHierarchyInactiveColliders>(true);
-            change.destroiedColliderType = state.GetBufferTypeHandle<PhysicsShapeDestroiedCollider>();
-            change.compoundColliderType = state.GetComponentTypeHandle<PhysicsShapeCompoundCollider>();
-            change.resultType = state.GetComponentTypeHandle<PhysicsCollider>();
-            change.bitFieldType = state.GetComponentTypeHandle<PhysicsHierarchyCollidersBitField>();
+            change.instanceType = __instanceType.UpdateAsRef(ref state);
+            change.inactiveCollidersType = __inactiveCollidersType.UpdateAsRef(ref state);
+            change.destroiedColliderType = __destroiedColliderType.UpdateAsRef(ref state);
+            change.compoundColliderType = __compoundColliderType.UpdateAsRef(ref state);
+            change.resultType = __resultType.UpdateAsRef(ref state);
+            change.bitFieldType = __bitFieldType.UpdateAsRef(ref state);
 
-            var jobHandle = change.ScheduleParallel(__group, state.Dependency);
+            var jobHandle = change.ScheduleParallelByRef(__group, state.Dependency);
 
             __colliders.AddDependency(state.GetSystemID(), jobHandle);
 
