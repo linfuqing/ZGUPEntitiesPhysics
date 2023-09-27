@@ -53,7 +53,7 @@ namespace ZG
                 }
                 else
                 {
-                    inactiveShapeIndex = child.gameObject.activeSelf ? -1 : (shapeResults == null ? 0 : shapeResults.Count);
+                    inactiveShapeIndex = child.gameObject.activeInHierarchy ? -1 : (shapeResults == null ? 0 : shapeResults.Count);
 
                     childColliders = null;
                     childShapes = null;
