@@ -308,21 +308,21 @@ namespace ZG
 
         public PhysicsHierarchyColliderSystemCore(ref SystemState state)
         {
-            __group = state.GetEntityQuery(
-                new EntityQueryDesc()
-                {
-                    All = new ComponentType[]
-                    {
-                        ComponentType.ReadOnly<PhysicsHierarchyData>(),
-                        ComponentType.ReadOnly<PhysicsHierarchyInactiveColliders>(),
-                        ComponentType.ReadWrite<PhysicsHierarchyCollidersBitField>(),
-                        ComponentType.ReadWrite<PhysicsShapeCompoundCollider>()
-                    }, 
-                    Options = EntityQueryOptions.IncludeDisabledEntities
-                });
-            __group.SetChangedVersionFilter(typeof(PhysicsHierarchyInactiveColliders));
+            using (var builder = new EntityQueryBuilder(Allocator.Temp))
+                __group = builder
+                        .WithAll<PhysicsHierarchyData, PhysicsHierarchyInactiveColliders>()
+                        .WithAllRW<PhysicsHierarchyCollidersBitField, PhysicsShapeCompoundCollider>()
+                        .WithOptions(EntityQueryOptions.IncludeDisabledEntities)
+                        .Build(ref state);
 
-            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.instance;
+            __group.SetChangedVersionFilter(ComponentType.ReadOnly<PhysicsHierarchyInactiveColliders>());
+
+            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.Retain();
+        }
+
+        public void Dispose()
+        {
+            __colliders.Release();
         }
 
         public void Update(ref SystemState state)

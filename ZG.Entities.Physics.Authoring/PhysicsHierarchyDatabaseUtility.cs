@@ -194,8 +194,6 @@ namespace ZG
 
         public static void Create(
             Transform root,
-            ref List<UnityEngine.Collider> colliders,
-            ref List<PhysicsShapeAuthoring> shapes,
             ref List<PhysicsHierarchyDatabase.Data.Shape> shapeResults,
             ref List<BlobAssetReference<Unity.Physics.Collider>> colliderResults,
             ref List<int> inactiveShapeIndices)
@@ -209,14 +207,15 @@ namespace ZG
                 foreach (Transform child in root)
                     Create(
                         child,
-                        ref colliders,
-                        ref shapes,
                         ref shapeResults,
                         ref colliderResults,
                         ref inactiveShapeIndices);
             }
             else
             {
+                List<UnityEngine.Collider> colliders = null;
+                List<PhysicsShapeAuthoring> shapes = null;
+
                 Create(
                     result,
                     root,
@@ -231,15 +230,11 @@ namespace ZG
 
         public static void Create(this PhysicsHierarchyDatabase database)
         {
-            List<UnityEngine.Collider> colliders = null;
-            List<PhysicsShapeAuthoring> shapes = null;
             List<PhysicsHierarchyDatabase.Data.Shape> shapeResults = null;
             List<BlobAssetReference<Unity.Physics.Collider>> colliderResults = null;
             List<int> inactiveShapeIndices = null;
             Create(
                 database.root,
-                ref colliders,
-                ref shapes,
                 ref shapeResults,
                 ref colliderResults,
                 ref inactiveShapeIndices);
