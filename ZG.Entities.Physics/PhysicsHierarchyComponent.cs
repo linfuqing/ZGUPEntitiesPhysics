@@ -109,18 +109,19 @@ namespace ZG
             if (numInactiveShapeIndices > 0)
             {
                 int inactiveShapeIndex;
-                PhysicsHierarchyInactiveTriggers inactiveTriggers;
-                PhysicsHierarchyInactiveColliders inactiveColliders;
+                PhysicsHierarchyInactiveTriggers[] inactiveTriggers = new PhysicsHierarchyInactiveTriggers[numInactiveShapeIndices];
+                PhysicsHierarchyInactiveColliders[] inactiveColliders = new PhysicsHierarchyInactiveColliders[numInactiveShapeIndices];
                 for(int i = 0; i < numInactiveShapeIndices; ++i)
                 {
                     inactiveShapeIndex = inactiveShapeIndices[i];
 
-                    inactiveTriggers.shapeIndex = inactiveShapeIndex;
-                    assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveTriggers);
+                    inactiveTriggers[i].shapeIndex = inactiveShapeIndex;
 
-                    inactiveColliders.shapeIndex = inactiveShapeIndex;
-                    assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveColliders);
+                    inactiveColliders[i].shapeIndex = inactiveShapeIndex;
                 }
+
+                assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveTriggers);
+                assigner.SetBuffer(EntityComponentAssigner.BufferOption.Override, entity, inactiveColliders);
             }
         }
     }
