@@ -441,45 +441,26 @@ namespace ZG
                                     triggerIndex = 0;
                                     for (j = 0; j < numColliders; ++j)
                                     {
-                                        ref var collider = ref shape.colliders[j];
-                                        ref var trigger = ref shape.triggers[triggerIndex];
+                                        //ref var collider = ref shape.colliders[j];
+                                        //handle.index = collider.index;
 
-                                        handle.index = collider.index;
-                                        if (trigger.index == j)
+                                        if (triggerIndex < numTriggers)
                                         {
-                                            parent.index = nextChildIndex;
-                                            parent.entity = value.entity;
-                                            parents[childEntities[nextChildIndex].value] = parent;
+                                            ref var trigger = ref shape.triggers[triggerIndex];
 
-                                            ++nextChildIndex;
+                                            if (trigger.index == j)
+                                            {
+                                                parent.index = nextChildIndex;
+                                                parent.entity = value.entity;
+                                                parents[childEntities[nextChildIndex].value] = parent;
 
-                                            ++triggerIndex;
+                                                ++nextChildIndex;
+
+                                                ++triggerIndex;
+                                            }
                                         }
-                                        /*else
-                                        {
-                                            hash ^= collider.hash;
-
-                                            colliderBlobInstance.CompoundFromChild = collider.transform;
-                                            colliderBlobInstance.Collider = colliders[handle];
-                                            colliderBlobInstances.Add(colliderBlobInstance);
-                                        }*/
                                     }
                                 }
-                                /*else
-                                {
-                                    for (j = 0; j < numColliders; ++j)
-                                    {
-                                        ref var collider = ref shape.colliders[j];
-
-                                        handle.index = collider.index;
-
-                                        hash ^= collider.hash;
-
-                                        colliderBlobInstance.CompoundFromChild = collider.transform;
-                                        colliderBlobInstance.Collider = colliders[handle];
-                                        colliderBlobInstances.Add(colliderBlobInstance);
-                                    }
-                                }*/
                             }
                         }
                         else if (isSource)

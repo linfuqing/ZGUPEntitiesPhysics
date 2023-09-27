@@ -179,20 +179,25 @@ namespace ZG
                                         triggerIndex = 0;
                                         for (j = 0; j < numColliders; ++j)
                                         {
-                                            ref var trigger = ref shape.triggers[triggerIndex];
-
-                                            if (trigger.index == j)
-                                                ++triggerIndex;
-                                            else
+                                            if (triggerIndex < numTriggers)
                                             {
-                                                ref var collider = ref shape.colliders[j];
+                                                ref var trigger = ref shape.triggers[triggerIndex];
 
-                                                handle.index = collider.index;
+                                                if (trigger.index == j)
+                                                {
+                                                    ++triggerIndex;
 
-                                                colliderBlobInstance.CompoundFromChild = collider.transform;
-                                                colliderBlobInstance.Collider = colliders[handle];
-                                                colliderBlobInstances[colliderCount++] = colliderBlobInstance;
+                                                    continue;
+                                                }
                                             }
+
+                                            ref var collider = ref shape.colliders[j];
+
+                                            handle.index = collider.index;
+
+                                            colliderBlobInstance.CompoundFromChild = collider.transform;
+                                            colliderBlobInstance.Collider = colliders[handle];
+                                            colliderBlobInstances[colliderCount++] = colliderBlobInstance;
                                         }
                                     }
                                     else
