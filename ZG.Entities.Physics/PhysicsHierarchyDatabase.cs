@@ -197,7 +197,10 @@ namespace ZG
             ref var shape = ref __definition.Value.shapes[shapeIndex];
 
             int numColliders = shape.colliders.Length;
-            if(numColliders < 1)
+            if (numColliders < 1)
+                return BlobAssetReference<Unity.Physics.Collider>.Null;
+
+            if (numColliders == 1)
             {
                 ref var collider = ref shape.colliders[0];
                 if (collider.transform.Equals(RigidTransform.identity))
