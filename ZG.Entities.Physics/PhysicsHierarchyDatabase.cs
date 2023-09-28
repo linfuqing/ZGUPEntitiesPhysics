@@ -106,11 +106,11 @@ namespace ZG
 
         public const int VERSION = 0;
 
-        [SerializeField, HideInInspector]
-        private byte[] __bytes;
+        [SerializeField, UnityEngine.Serialization.FormerlySerializedAs("__inactiveShapeIndices")]
+        internal int[] _inactiveShapeIndices;
 
         [SerializeField, HideInInspector]
-        private int[] __inactiveShapeIndices;
+        private byte[] __bytes;
 
         [SerializeField, HideInInspector]
         private int __colliderCount;
@@ -123,7 +123,7 @@ namespace ZG
 
         public IReadOnlyList<BlobAssetReference<Unity.Physics.Collider>> colliders => __colliders;
 
-        public IReadOnlyList<int> inactiveShapeIndices => __inactiveShapeIndices;
+        public IReadOnlyList<int> inactiveShapeIndices => _inactiveShapeIndices;
 
         public BlobAssetReference<PhysicsHierarchyDefinition> definition
         {
@@ -308,7 +308,7 @@ namespace ZG
             BlobAssetReference<Unity.Physics.Collider>[] colliderResults,
             int[] inactiveShapeIndices)
         {
-            __inactiveShapeIndices = inactiveShapeIndices;
+            _inactiveShapeIndices = inactiveShapeIndices;
 
             __colliders =  colliderResults;
 

@@ -37,7 +37,7 @@ namespace ZG
             if (shapesTemp != null && shapesTemp.Length > 0)
                 shapes.AddRange(shapesTemp);
 
-            int inactiveShapeIndex = transform.gameObject.activeInHierarchy ? -1 : (shapeResults == null ? 0 : shapeResults.Count), numShapes, i;
+            int i, numShapes;
             IPhysicsHierarchyShape childShape;
             List<UnityEngine.Collider> childColliders;
             List<PhysicsShapeAuthoring> childShapes;
@@ -46,8 +46,6 @@ namespace ZG
                 childShape = child.GetComponent<IPhysicsHierarchyShape>();
                 if (childShape == null)
                 {
-                    inactiveShapeIndex = -1;
-
                     childColliders = colliders;
                     childShapes = shapes;
                 }
@@ -70,6 +68,8 @@ namespace ZG
 
             if (result != null)
             {
+                int inactiveShapeIndex = transform.gameObject.IsActiveIn(root) ? -1 : (shapeResults == null ? 0 : shapeResults.Count);
+
                 using (var colliderBlobInstances = new NativeList<CompoundCollider.ColliderBlobInstance>(Allocator.TempJob))
                 {
                     List<PhysicsHierarchyDatabase.Data.Trigger> triggers = null;
@@ -177,18 +177,18 @@ namespace ZG
 
                     shapeResults.Add(shapeResult);
                 }
-            }
 
-            if (inactiveShapeIndex != -1 && shapeResults != null)
-            {
-                numShapes = shapeResults.Count;
-                if (numShapes > 0)
+                if (inactiveShapeIndex != -1 && shapeResults != null)
                 {
-                    if (inactiveShapeIndices == null)
-                        inactiveShapeIndices = new List<int>();
+                    numShapes = shapeResults.Count;
+                    if (numShapes > 0)
+                    {
+                        if (inactiveShapeIndices == null)
+                            inactiveShapeIndices = new List<int>();
 
-                    for (i = inactiveShapeIndex; i < numShapes; ++i)
-                        inactiveShapeIndices.Add(i);
+                        for (i = inactiveShapeIndex; i < numShapes; ++i)
+                            inactiveShapeIndices.Add(i);
+                    }
                 }
             }
         }
