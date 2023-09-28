@@ -37,7 +37,7 @@ namespace ZG
             if (shapesTemp != null && shapesTemp.Length > 0)
                 shapes.AddRange(shapesTemp);
 
-            int i, inactiveShapeIndex, numShapes;
+            int inactiveShapeIndex = transform.gameObject.activeInHierarchy ? -1 : (shapeResults == null ? 0 : shapeResults.Count), numShapes, i;
             IPhysicsHierarchyShape childShape;
             List<UnityEngine.Collider> childColliders;
             List<PhysicsShapeAuthoring> childShapes;
@@ -53,8 +53,6 @@ namespace ZG
                 }
                 else
                 {
-                    inactiveShapeIndex = child.gameObject.activeInHierarchy ? -1 : (shapeResults == null ? 0 : shapeResults.Count);
-
                     childColliders = null;
                     childShapes = null;
                 }
@@ -68,16 +66,6 @@ namespace ZG
                     ref shapeResults,
                     ref colliderResults,
                     ref inactiveShapeIndices);
-
-                if (inactiveShapeIndex != -1 && shapeResults != null)
-                {
-                    if (inactiveShapeIndices == null)
-                        inactiveShapeIndices = new List<int>();
-
-                    numShapes = shapeResults.Count;
-                    for (i = inactiveShapeIndex; i < numShapes; ++i)
-                        inactiveShapeIndices.Add(i);
-                }
             }
 
             if (result != null)
@@ -190,9 +178,22 @@ namespace ZG
                     shapeResults.Add(shapeResult);
                 }
             }
+
+            if (inactiveShapeIndex != -1 && shapeResults != null)
+            {
+                numShapes = shapeResults.Count;
+                if (numShapes > 0)
+                {
+                    if (inactiveShapeIndices == null)
+                        inactiveShapeIndices = new List<int>();
+
+                    for (i = inactiveShapeIndex; i < numShapes; ++i)
+                        inactiveShapeIndices.Add(i);
+                }
+            }
         }
 
-        public static void Create(
+        /*public static void Create(
             Transform root,
             ref List<PhysicsHierarchyDatabase.Data.Shape> shapeResults,
             ref List<BlobAssetReference<Unity.Physics.Collider>> colliderResults,
@@ -226,18 +227,29 @@ namespace ZG
                     ref colliderResults,
                     ref inactiveShapeIndices);
             }
-        }
+        }*/
 
         public static void Create(this PhysicsHierarchyDatabase database)
         {
             List<PhysicsHierarchyDatabase.Data.Shape> shapeResults = null;
             List<BlobAssetReference<Unity.Physics.Collider>> colliderResults = null;
-            List<int> inactiveShapeIndices = null;
+            List<int> inactiveShapeIndices = null; 
+            List<UnityEngine.Collider> colliders = null;
+            List<PhysicsShapeAuthoring> shapes = null;
             Create(
+                database.root.GetComponent<IPhysicsHierarchyShape>(),
                 database.root,
+                database.root,
+                ref colliders,
+                ref shapes,
                 ref shapeResults,
                 ref colliderResults,
                 ref inactiveShapeIndices);
+            /*Create(
+                database.root,
+                ref shapeResults,
+                ref colliderResults,
+                ref inactiveShapeIndices);*/
 
             database.data.shapes = shapeResults == null ? null : shapeResults.ToArray();
 
