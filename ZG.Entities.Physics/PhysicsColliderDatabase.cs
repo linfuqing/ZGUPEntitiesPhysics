@@ -8,8 +8,6 @@ using Unity.Physics;
 using UnityEngine;
 using ZG.Mathematics;
 using Unity.Collections.LowLevel.Unsafe;
-using UnityEngine.UIElements;
-using FNSDK;
 
 namespace ZG
 {
