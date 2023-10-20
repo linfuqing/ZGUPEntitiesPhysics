@@ -59,18 +59,45 @@ namespace ZG
             get
             {
                 CompoundCollider.ColliderBlobInstance result;
-                ref var shape = ref _database.definition.Value.shapes[0];
-                if (shape.colliders.Length > 0)
-                {
-                    ref var collider = ref shape.colliders[0];
 
-                    result.Collider = _database.colliders[collider.index];
-                    result.CompoundFromChild = collider.transform;
-                }
-                else
+                result.Collider = BlobAssetReference<Collider>.Null;
+                result.CompoundFromChild = RigidTransform.identity;
+
+                var colliders = _database.colliders;
+                ref var shapes = ref _database.definition.Value.shapes;
+
+                bool isContains;
+                int numShapes = shapes.Length;
+                var inactiveShapeIndices = _database.inactiveShapeIndices;
+                for (int i = 0; i < numShapes; ++i)
                 {
-                    result.Collider = BlobAssetReference<Collider>.Null;
-                    result.CompoundFromChild = RigidTransform.identity;
+                    isContains = false;
+                    if (inactiveShapeIndices != null)
+                    {
+                        foreach (var inactiveShapeIndex in inactiveShapeIndices)
+                        {
+                            if (inactiveShapeIndex == i)
+                            {
+                                isContains = true;
+
+                                break;
+                            }
+                        }
+                    }
+
+                    if (isContains)
+                        continue;
+
+                    ref var shape = ref shapes[i];
+                    if (shape.colliders.Length > 0)
+                    {
+                        ref var collider = ref shape.colliders[0];
+
+                        result.Collider = colliders[collider.index];
+                        result.CompoundFromChild = collider.transform;
+                    }
+
+                    break;
                 }
 
                 return result;

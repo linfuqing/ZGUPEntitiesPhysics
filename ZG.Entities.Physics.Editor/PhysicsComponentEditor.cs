@@ -23,7 +23,7 @@ namespace ZG
             var handleMatrix = math.float4x4(physicsComponent.GetTransform());
             using (new Handles.DrawingScope(handleColor, handleMatrix))
             {
-                if (physicsComponent.TryGetComponentData<PhysicsCollider>(out var collider))
+                if (physicsComponent.TryGetComponentData(out PhysicsCollider collider))
                 {
                     PhysicsDrawingUtility.Draw(collider.Value, RigidTransform.identity);
                 }
