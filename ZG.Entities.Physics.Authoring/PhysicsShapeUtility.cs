@@ -188,6 +188,8 @@ namespace ZG
                     {
                         var authoring = shape.GetCapsuleProperties();
 
+                        UnityEngine.Assertions.Assert.IsTrue(authoring.Height > math.FLT_MIN_NORMAL, shape.name);
+
                         authoring.CreateCollider(
                             isBake, 
                             GetFilter(shape, groupIndex), 
