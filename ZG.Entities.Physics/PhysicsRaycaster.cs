@@ -277,23 +277,7 @@ namespace ZG.Entities.Physics
             get
             {
                 if (__world == null)
-                {
-                    if (string.IsNullOrEmpty(worldName))
-                        __world = World.DefaultGameObjectInjectionWorld;
-                    else
-                    {
-                        __world = null;
-                        foreach (World temp in World.All)
-                        {
-                            if (temp.Name == worldName)
-                            {
-                                __world = temp;
-
-                                break;
-                            }
-                        }
-                    }
-                }
+                    __world = WorldUtility.GetWorld(worldName);
 
                 return __world;
             }
