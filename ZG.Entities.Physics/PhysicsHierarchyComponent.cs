@@ -106,7 +106,7 @@ namespace ZG
 
         void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
-            var transform = gameObjectEntity.transform;
+            /*var transform = gameObjectEntity.transform;
 
             Translation translation;
             translation.Value = transform.position;
@@ -115,7 +115,7 @@ namespace ZG
             //±ØÐë
             Rotation rotation;
             rotation.Value = transform.rotation;
-            assigner.SetComponentData(entity, rotation);
+            assigner.SetComponentData(entity, rotation);*/
 
             PhysicsHierarchyData instance;
             instance.definition = _database.definition;

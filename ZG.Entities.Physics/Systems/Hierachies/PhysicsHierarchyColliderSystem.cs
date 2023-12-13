@@ -118,7 +118,8 @@ namespace ZG
                     colliderCount += numColliders;
                 }
 
-                if (hash != source.hash)
+                //hash ^= (uint)destination.GetHashCode();
+                //if (hash != source.hash)
                 {
                     PhysicsShapeCompoundCollider compoundCollider;
                     compoundCollider.value = BlobAssetReference<Collider>.Null;

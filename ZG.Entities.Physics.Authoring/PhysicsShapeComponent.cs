@@ -21,7 +21,7 @@ namespace ZG
     [EntityComponent(typeof(PhysicsShapeColliderBlobInstance))]
     [EntityComponent(typeof(PhysicsShapeChild))]
     [EntityComponent(typeof(PhysicsShapeDestroiedCollider))]
-    public partial class PhysicsShapeComponent : EntityProxyComponent, IEntityComponent, IPhysicsHierarchyShape, IPhysicsComponent, ISerializationCallbackReceiver
+    public partial class PhysicsShapeComponent : EntityProxyComponent, IPhysicsHierarchyShape, IPhysicsComponent, ISerializationCallbackReceiver
     {
         [Flags]
         internal enum Flag
@@ -1513,7 +1513,7 @@ namespace ZG
             __system.MaskRebuild(root);
         }*/
 
-        void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
+        /*void IEntityComponent.Init(in Entity entity, EntityComponentAssigner assigner)
         {
             if (_parent == null)
             {
@@ -1528,10 +1528,7 @@ namespace ZG
                 rotation.Value = transform.rotation;
                 assigner.SetComponentData(entity, rotation);
             }
-
-            /*__system = world.GetExistingSystem<System>();
-            __system.MaskRebuild(root);*/
-        }
+        }*/
 
         void ISerializationCallbackReceiver.OnAfterDeserialize()
         {
