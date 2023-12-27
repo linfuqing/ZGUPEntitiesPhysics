@@ -163,7 +163,7 @@ namespace ZG
 
             public unsafe bool AddHit(T hit)
             {
-                Assert.IsTrue(hit.Fraction <= MaxFraction);
+                Assert.IsTrue(hit.Fraction <= MaxFraction/*, hit.Entity.ToString()*/);
 
                 // Check self hits and trigger hits
                 if (hit.RigidBodyIndex == __selfRBIndex)

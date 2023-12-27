@@ -29,7 +29,7 @@ namespace ZG
     }
 
     [BurstCompile, UpdateInGroup(typeof(PhysicsHierarchyTriggerSystemGroup), OrderFirst = true)]
-    public partial struct PhysicsHierarchyTriggerFactroySystem : ISystem
+    public partial struct PhysicsHierarchyTriggerFactorySystem : ISystem
     {
         public static readonly int InnerloopBatchCount = 1;
 
@@ -90,7 +90,7 @@ namespace ZG
         }
     }
 
-    [BurstCompile, CreateAfter(typeof(PhysicsHierarchyTriggerFactroySystem)), UpdateInGroup(typeof(PhysicsHierarchyTriggerSystemGroup))]
+    [BurstCompile, CreateAfter(typeof(PhysicsHierarchyTriggerFactorySystem)), UpdateInGroup(typeof(PhysicsHierarchyTriggerSystemGroup))]
     public partial struct PhysicsHierarchyTriggerSystem : ISystem
     {
         private struct Key : IEquatable<Key>
@@ -690,7 +690,7 @@ namespace ZG
 
             __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.instance;
 
-            __prefabs = state.WorldUnmanaged.GetExistingSystemUnmanaged<PhysicsHierarchyTriggerFactroySystem>().prefabs;
+            __prefabs = state.WorldUnmanaged.GetExistingSystemUnmanaged<PhysicsHierarchyTriggerFactorySystem>().prefabs;
 
             __triggerCount = new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             __triggerEntitiesToCreate = new NativeParallelMultiHashMap<Key, Entity>(1, Allocator.Persistent);

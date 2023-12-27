@@ -112,6 +112,9 @@ namespace ZG
         [SerializeField, HideInInspector]
         private byte[] __bytes;
 
+        [SerializeField, HideInInspector] 
+        private string _guid;
+
         [SerializeField, HideInInspector]
         private int __colliderCount;
 
@@ -120,7 +123,7 @@ namespace ZG
         private BlobAssetReference<PhysicsHierarchyDefinition> __definition;
         private BlobAssetReference<Unity.Physics.Collider>[] __colliders;
         private Dictionary<int, BlobAssetReference<Unity.Physics.Collider>> __shapeColliders;
-
+        
         public IReadOnlyList<BlobAssetReference<Unity.Physics.Collider>> colliders => __colliders;
 
         public IReadOnlyList<int> inactiveShapeIndices => _inactiveShapeIndices;
@@ -234,6 +237,8 @@ namespace ZG
             return result;
         }
 
+        private static Dictionary<string, int> __instanceIDs;
+        
         void ISerializationCallbackReceiver.OnAfterDeserialize()
         {
             if (__bytes != null && __bytes.Length > 0)
@@ -261,6 +266,24 @@ namespace ZG
                             UnityEngine.Assertions.Assert.AreEqual(VERSION, version);
 
                             __definition = reader.Read<PhysicsHierarchyDefinition>();
+
+                            int instanceID;
+                            if (string.IsNullOrEmpty(_guid))
+                                instanceID = __definition.GetHashCode();
+                            else
+                            {
+                                if (__instanceIDs == null)
+                                    __instanceIDs = new Dictionary<string, int>();
+                                
+                                if (!__instanceIDs.TryGetValue(_guid, out instanceID))
+                                {
+                                    instanceID = __definition.GetHashCode();
+
+                                    __instanceIDs[_guid] = instanceID;
+                                }
+                            }
+
+                            __definition.Value.instanceID = instanceID;
 
                             __colliders = new BlobAssetReference<Unity.Physics.Collider>[__colliderCount];
                             for (int i = 0; i < __colliderCount; ++i)
@@ -330,6 +353,8 @@ namespace ZG
         public void EditorMaskDirty()
         {
             Rebuild();
+
+            _guid = UnityEditor.AssetDatabase.AssetPathToGUID(UnityEditor.AssetDatabase.GetAssetPath(this));
 
             UnityEditor.EditorUtility.SetDirty(this);
         }
