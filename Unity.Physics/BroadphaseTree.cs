@@ -341,7 +341,7 @@ namespace ZG
 
         public struct Container
         {
-            public readonly Allocator allocator;
+            public readonly AllocatorManager.AllocatorHandle Allocator;
 
             [NoAlias]
             private NativeArray<Node> __nodes;
@@ -366,7 +366,7 @@ namespace ZG
 
             public Container(ref BroadphaseTree origin)
             {
-                allocator = origin.__nodes.allocator;
+                Allocator = origin.__nodes.allocator;
 
                 __nodes = origin.__nodes;
                 __nodeFilters = origin.__nodeFilters;
@@ -378,7 +378,7 @@ namespace ZG
             internal Broadphase.Tree As()
             {
                 Broadphase.Tree tree;
-                tree.Allocator = allocator;
+                tree.Allocator = Allocator.ToAllocator;
                 tree.Nodes = __nodes;
                 tree.NodeFilters = __nodeFilters;
                 tree.BodyFilters = __bodyFilters;
@@ -410,7 +410,7 @@ namespace ZG
 
         public int bodyCount => __bodyFilters.Length;
 
-        public BroadphaseTree(int numBodies, Allocator allocator = Allocator.Persistent)
+        public BroadphaseTree(int numBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             BurstUtility.InitializeJob<BuildFirstNLevelsJob>();
             //BurstUtility.InitializeJobParalledForDefer<BuildBranchesJob>();
@@ -641,7 +641,7 @@ namespace ZG
             return handle;
         }
 
-        private void __SetCapacity(int numBodies, Allocator allocator)
+        private void __SetCapacity(int numBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             int numNodes = numBodies + Constants.MaxNumTreeBranches;
 

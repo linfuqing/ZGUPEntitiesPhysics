@@ -23,7 +23,7 @@ namespace ZG
         public DynamicsWorldLite dynamicsWorld => __dynamicsWorld;
 
         // Construct a world with the given number of uninitialized bodies and joints
-        public unsafe PhysicsWorldLite(int numStaticBodies, int numDynamicBodies, Allocator allocator)
+        public unsafe PhysicsWorldLite(int numStaticBodies, int numDynamicBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             __collisionWorld = new CollisionWorldLite(numStaticBodies, numDynamicBodies, allocator);
             __dynamicsWorld = new DynamicsWorldLite(numDynamicBodies, allocator);
@@ -185,7 +185,7 @@ namespace ZG
 
         private Data* __data;
 
-        public readonly Allocator allocator;
+        public readonly AllocatorManager.AllocatorHandle allocator;
 
         public ref LookupJobManager lookupJobManager => ref __data->lookupJobManager;
 
@@ -198,11 +198,11 @@ namespace ZG
         public PhysicsWorldContainer container => __data->value;
 
         // Construct a world with the given number of uninitialized bodies and joints
-        public unsafe SharedPhysicsWorld(int numStaticBodies, int numDynamicBodies, Allocator allocator)
+        public unsafe SharedPhysicsWorld(int numStaticBodies, int numDynamicBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             this.allocator = allocator;
 
-            __data = (Data*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<Data>(), UnsafeUtility.AlignOf<Data>(), allocator);
+            __data = AllocatorManager.Allocate<Data>(allocator);
             __data->value = new PhysicsWorldLite(numStaticBodies, numDynamicBodies, allocator);
             __data->lookupJobManager = new LookupJobManager();
         }
@@ -212,7 +212,7 @@ namespace ZG
         {
             __data->value._Dispose();
 
-            UnsafeUtility.Free(__data, allocator);
+            AllocatorManager.Free(allocator, __data);
 
             __data = null;
         }

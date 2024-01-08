@@ -23,7 +23,7 @@ namespace ZG
         public Aabb domain =>
             Aabb.Union(__staticTree.boundingVolumeHierarchy.Domain, __dynamicTree.boundingVolumeHierarchy.Domain);
 
-        public BroadphaseLite(int numStaticBodies, int numDynamicBodies, Allocator allocator)
+        public BroadphaseLite(int numStaticBodies, int numDynamicBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             __staticTree = new BroadphaseTree(numStaticBodies, allocator);
             __dynamicTree = new BroadphaseTree(numDynamicBodies, allocator);

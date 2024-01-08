@@ -243,7 +243,7 @@ namespace ZG
         public NativeArray<MotionVelocity> motionVelocities => __motionVelocities;
 
         // Construct a world with the given number of uninitialized bodies and joints
-        public unsafe DynamicsWorldLite(int numDynamicBodies, Allocator allocator)
+        public unsafe DynamicsWorldLite(int numDynamicBodies, in AllocatorManager.AllocatorHandle allocator)
         {
             __motionDatas = new NativeArrayLite<MotionData>(numDynamicBodies, allocator, NativeArrayOptions.UninitializedMemory);
             __motionVelocities = new NativeArrayLite<MotionVelocity>(numDynamicBodies, allocator, NativeArrayOptions.UninitializedMemory);
@@ -253,7 +253,7 @@ namespace ZG
         {
             if (__motionDatas.Length < numDynamicBodies)
             {
-                Allocator allocator = __motionDatas.allocator;
+                var allocator = __motionDatas.allocator;
 
                 __motionDatas.Dispose();
 
@@ -262,7 +262,7 @@ namespace ZG
 
             if (__motionVelocities.Length < numDynamicBodies)
             {
-                Allocator allocator = __motionVelocities.allocator;
+                var allocator = __motionVelocities.allocator;
 
                 __motionVelocities.Dispose();
 
