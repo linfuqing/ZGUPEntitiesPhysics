@@ -324,10 +324,12 @@ namespace ZG
                             if (sizeIndex >= numSizes)
                                 break;
 
-                            blockReader = reader.ReadBlock(sizes[sizeIndex++]).reader;
+                            blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
                             blockReader.DeserializeStream(ref entityManager, ref assigner, entity, 
                                 colliderKeys.IsCreated ? 
                                     colliderKeys.GetSubArray(sizeIndex, 1).Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()) : default);
+
+                            ++sizeIndex;
                         }
                     }
 
