@@ -234,9 +234,10 @@ namespace ZG
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
-                var colliderCounts = new NativeArray<int>(__colliderCount, Allocator.Temp);
+                var colliderCounts = new NativeArray<int>(__colliderCount, Allocator.Temp, NativeArrayOptions.ClearMemory);
                 var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
-
+                colliderCounts.Dispose();
+                
                 int numSizes = sizes.Length;
                 ColliderKey colliderKey;
                 UnsafeBlock.Reader blockReader;
