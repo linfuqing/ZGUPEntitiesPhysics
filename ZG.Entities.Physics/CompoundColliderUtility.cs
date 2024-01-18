@@ -4,9 +4,11 @@ using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Burst;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Transforms;
 using Unity.Physics;
+using ZG.Unsafe;
 using Math = ZG.Mathematics.Math;
 
 namespace ZG
@@ -174,8 +176,8 @@ namespace ZG
 
                 int numChildren = children.Length;
                 var colliderCounts =
-                    new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts);
+                    new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts, out var colliderKeys);
                 
                 int numColliderKeyBits = Math.GetHighestBit(numChildren), 
                     numSerializerEntites = 0, numColliderEntities = 0;
@@ -236,8 +238,15 @@ namespace ZG
                             if (sizeIndex >= numSizes)
                                 break;
                             
-                            blockReader = reader.ReadBlock(sizes[sizeIndex++]).reader;
-                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
+                            blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
+                            blockReader.DeserializeStream(
+                                ref entityManager, 
+                                ref assigner, 
+                                entity, 
+                                colliderKeys.IsCreated ? 
+                                    colliderKeys.GetSubArray(sizeIndex, 1).Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()) : default);
+
+                            ++sizeIndex;
                         }
 
                         if (entityIndex == numSerializerEntites)
@@ -280,8 +289,8 @@ namespace ZG
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numColliders, allocator);
                 
                 var colliderCounts =
-                    new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts);
+                    new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts, out var colliderKeys);
                 int numSizes = sizes.Length;
                 if (numSizes > 0)
                 {
@@ -316,7 +325,9 @@ namespace ZG
                                 break;
 
                             blockReader = reader.ReadBlock(sizes[sizeIndex++]).reader;
-                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
+                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity, 
+                                colliderKeys.IsCreated ? 
+                                    colliderKeys.GetSubArray(sizeIndex, 1).Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()) : default);
                         }
                     }
 
@@ -384,11 +395,17 @@ namespace ZG
             return world.GetOrCreateSystemManaged<System>().Deserialize(ref reader, allocator);
         }
 
-        public static NativeArray<int> DeserializeDeserializers(this ref NativeBuffer.Reader reader, ref NativeArray<int> colliderCounts)
+        public static NativeArray<int> DeserializeDeserializers<T>(
+            this ref T reader, 
+            ref NativeArray<int> colliderCounts, 
+            out NativeArray<ColliderKey> colliderKeys) where T : struct, INativeReader
         {
             int numSizes = reader.isVail ? reader.Read<int>() : 0;
             if (numSizes < 1)
+            {
+                colliderKeys = default;
                 return default;
+            }
 
             var sizes = reader.ReadArray<int>(numSizes);
 
@@ -401,14 +418,20 @@ namespace ZG
             {
                 var position = reader.position;
                 reader.position = offset;
-                reader.ReadArray<int>(colliderCounts.Length).CopyTo(colliderCounts);
+                colliderKeys = reader.ReadArray<ColliderKey>(numSizes);
                 reader.position = position;
             }
             else
+                colliderKeys = default;
+
+            if (colliderKeys.IsCreated && colliderCounts.IsCreated)
             {
-                int numColliderCounts = colliderCounts.Length;
-                for (int i = 0; i < numColliderCounts; ++i)
-                    colliderCounts[i] = i < numSizes ? 1 : 0;
+                uint numSubKeyBits = (uint)Math.GetHighestBit(colliderKeys.Length), colliderIndex;
+                for (int i = 0; i < numSizes; ++i)
+                {
+                    if (colliderKeys.ElementAt(i).PopSubKey(numSubKeyBits, out colliderIndex))
+                        colliderCounts.Increment((int)colliderIndex);
+                }
             }
 
             return sizes;
@@ -450,32 +473,35 @@ namespace ZG
                 
                 writer.Write(numSerializers);
 
-                int[] counts = null;
+                //int[] counts = null;
                 var sizes = writer.WriteBlock(sizeof(int) * numSerializers, false).writer;
-                ColliderKey key;
-                uint numSubKeyBits = (uint)Math.GetHighestBit(colliderCount), index;
+                //ColliderKey key;
+                //uint numSubKeyBits = (uint)Math.GetHighestBit(colliderCount), index;
                 int source = writer.position, destination;
                 foreach (var serializer in serializersArray)
                 {
-                    key = serializer.Key;
+                    /*key = serializer.Key;
                     if (key.PopSubKey(numSubKeyBits, out index))
                     {
                         if(counts == null || counts.Length <= index)
                             Array.Resize(ref counts, (int)index + 1);
 
                         ++counts[index];
-                    }
+                    }*/
                     
                     serializer.Value.Serialize(ref writer);
-                    writer.Write(key);
+                    //writer.Write(key);
 
                     destination = writer.position;
                     sizes.Write(destination - source);
                     source = destination;
                 }
                 
-                if(counts != null)
-                    writer.Write(counts);
+                foreach (var serializer in serializersArray)
+                    writer.Write(serializer.Key);
+                
+                /*if(counts != null)
+                    writer.Write(counts);*/
             }
         }
 

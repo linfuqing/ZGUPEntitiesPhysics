@@ -186,13 +186,14 @@ namespace ZG
 
                     var componentTypes = new NativeList<ComponentType>(Allocator.Temp);
 
-                    var sizes = reader.ReadArray<int>(reader.Read<int>());
+                    NativeArray<int> colliderCounts = default;
+                    var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
 
                     UnsafeBlock.Reader blockReader;
                     foreach (var size in sizes)
                     {
                         blockReader = reader.ReadBlock(size).reader;
-                        blockReader.DeserializeStream(ref componentTypes);
+                        blockReader.DeserializeStream(ref componentTypes, colliderKeys.Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                     }
 
                     int numComponentTypes = componentTypes.Length;
@@ -231,14 +232,15 @@ namespace ZG
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
-                var sizes = reader.ReadArray<int>(reader.Read<int>());
-
+                NativeArray<int> colliderCounts = default;
+                var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
+                
                 UnsafeBlock.Reader blockReader;
                 foreach (var size in sizes)
                 {
                     blockReader = reader.ReadBlock(size).reader;
 
-                    blockReader.DeserializeStream(ref assigner, entity);
+                    blockReader.DeserializeStream(ref assigner, entity, colliderKeys.Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                 }
             }
         }
