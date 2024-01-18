@@ -201,6 +201,7 @@ namespace ZG
                 {
                     int entityCount = numEntities, entityIndex = 0, sizeIndex = 0, colliderCount, j;
                     Entity entity;
+                    ColliderKey colliderKey;
                     Translation translation;
                     Rotation rotation;
                     PhysicsCollider physicsCollider;
@@ -237,14 +238,23 @@ namespace ZG
                         {
                             if (sizeIndex >= numSizes)
                                 break;
-                            
+
+                            if (colliderKeys.IsCreated)
+                            {
+                                colliderKey = colliderKeys[sizeIndex];
+                                if (!colliderKey.PopSubKey((uint)numColliderKeyBits, out _))
+                                    colliderKey = ColliderKey.Empty;
+                            }
+                            else
+                                colliderKey = ColliderKey.Empty;
+
                             blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
                             blockReader.DeserializeStream(
                                 ref entityManager, 
                                 ref assigner, 
                                 entity, 
-                                colliderKeys.IsCreated ? 
-                                    colliderKeys.GetSubArray(sizeIndex, 1).Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()) : default);
+                                colliderKey.Equals(ColliderKey.Empty) ? 
+                                    default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
 
                             ++sizeIndex;
                         }
@@ -295,7 +305,9 @@ namespace ZG
                 if (numSizes > 0)
                 {
                     int sizeIndex = 0, colliderCount, j;
+                    uint numColliderKeyBits = (uint)Math.GetHighestBit(numColliders);
                     Entity entity;
+                    ColliderKey colliderKey;
                     Translation translation;
                     Rotation rotation;
                     PhysicsCollider physicsCollider;
@@ -323,11 +335,20 @@ namespace ZG
                         {
                             if (sizeIndex >= numSizes)
                                 break;
+                            
+                            if (colliderKeys.IsCreated)
+                            {
+                                colliderKey = colliderKeys[sizeIndex];
+                                if (!colliderKey.PopSubKey(numColliderKeyBits, out _))
+                                    colliderKey = ColliderKey.Empty;
+                            }
+                            else
+                                colliderKey = ColliderKey.Empty;
 
                             blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
                             blockReader.DeserializeStream(ref entityManager, ref assigner, entity, 
-                                colliderKeys.IsCreated ? 
-                                    colliderKeys.GetSubArray(sizeIndex, 1).Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()) : default);
+                                colliderKey.Equals(ColliderKey.Empty) ? 
+                                    default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
 
                             ++sizeIndex;
                         }
@@ -406,6 +427,7 @@ namespace ZG
             if (numSizes < 1)
             {
                 colliderKeys = default;
+                
                 return default;
             }
 
@@ -428,10 +450,10 @@ namespace ZG
 
             if (colliderKeys.IsCreated && colliderCounts.IsCreated)
             {
-                uint numSubKeyBits = (uint)Math.GetHighestBit(colliderKeys.Length), colliderIndex;
+                uint numSubKeyBits = (uint)Math.GetHighestBit(colliderCounts.Length), colliderIndex;
                 for (int i = 0; i < numSizes; ++i)
                 {
-                    if (colliderKeys.ElementAt(i).PopSubKey(numSubKeyBits, out colliderIndex))
+                    if (colliderKeys[i].PopSubKey(numSubKeyBits, out colliderIndex))
                         colliderCounts.Increment((int)colliderIndex);
                 }
             }
@@ -463,7 +485,6 @@ namespace ZG
         
         public static void SerializeSerializers(
             this ref NativeBuffer.Writer writer, 
-            int colliderCount, 
             ICollection<KeyValuePair<ColliderKey, IEntityDataStreamSerializer>> serializers)
         {
             int numSerializers = serializers == null ? 0 : serializers.Count;
@@ -556,7 +577,7 @@ namespace ZG
             {
                 writer.SerializeColliderBlobInstances(colliderBlobInstances);
 
-                SerializeSerializers(ref writer, colliderBlobInstances.Length, serializers);
+                SerializeSerializers(ref writer, serializers);
             }
             else
                 writer.SerializeColliderBlobInstances(colliderBlobInstances);
@@ -610,7 +631,7 @@ namespace ZG
             {
                 writer.SerializeColliders(colliders);
 
-                SerializeSerializers(ref writer, colliders.Length, serializers);
+                SerializeSerializers(ref writer, serializers);
             }
             else
                 writer.SerializeColliders(colliders);

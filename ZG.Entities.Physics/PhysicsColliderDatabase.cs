@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using Unity.Mathematics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Physics;
 using UnityEngine;
+using ZG.Unsafe;
 using ZG.Mathematics;
-using Unity.Collections.LowLevel.Unsafe;
 
 namespace ZG
 {
@@ -119,6 +119,8 @@ namespace ZG
         internal SerializatedType _serializatedType;
         [HideInInspector, SerializeField, UnityEngine.Serialization.FormerlySerializedAs("__bytes")]
         internal byte[] _bytes;
+
+        private int __colliderCount;
 
         private BlobAssetReference<Unity.Physics.Collider> __collider;
 
@@ -232,15 +234,30 @@ namespace ZG
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
-                NativeArray<int> colliderCounts = default;
+                var colliderCounts = new NativeArray<int>(__colliderCount, Allocator.Temp);
                 var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
-                
-                UnsafeBlock.Reader blockReader;
-                foreach (var size in sizes)
-                {
-                    blockReader = reader.ReadBlock(size).reader;
 
-                    blockReader.DeserializeStream(ref assigner, entity, colliderKeys.Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
+                int numSizes = sizes.Length;
+                ColliderKey colliderKey;
+                UnsafeBlock.Reader blockReader;
+                for(int i = 0; i < numSizes; ++i)
+                {
+                    blockReader = reader.ReadBlock(sizes[i]).reader;
+
+                    if (colliderKeys.IsCreated)
+                    {
+                        colliderKey = colliderKeys[i];
+                        if (!colliderKey.PopSubKey((uint)__colliderCount, out _))
+                            colliderKey = ColliderKey.Empty;
+                    }
+                    else
+                        colliderKey = ColliderKey.Empty;
+
+                    blockReader.DeserializeStream(
+                        ref assigner, 
+                        entity, 
+                        colliderKey.Equals(ColliderKey.Empty) ? default : 
+                            colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                 }
             }
         }
@@ -310,7 +327,9 @@ namespace ZG
                         break;
                 }
 
-                if (colliderBlobInstances.Length == 1 && colliderBlobInstances[0].CompoundFromChild.Equals(RigidTransform.identity))
+                __colliderCount = colliderBlobInstances.Length;
+
+                if (__colliderCount == 1 && colliderBlobInstances[0].CompoundFromChild.Equals(RigidTransform.identity))
                     __collider = colliderBlobInstances[0].Collider;
                 else if (!colliderBlobInstances.IsEmpty)
                 {
