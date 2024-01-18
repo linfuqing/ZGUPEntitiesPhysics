@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Entities;
@@ -18,6 +19,14 @@ namespace ZG
 
     public static partial class CompoundColliderUtility
     {
+        private struct Comparer : IComparer<KeyValuePair<ColliderKey, IEntityDataStreamSerializer>>
+        {
+            public int Compare(KeyValuePair<ColliderKey, IEntityDataStreamSerializer> x, KeyValuePair<ColliderKey, IEntityDataStreamSerializer> y)
+            {
+                return x.Key.Value.CompareTo(y.Key.Value);
+            }
+        }
+        
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Deterministic)]
         private struct CreateRightNowJob : IJob
         {
@@ -123,7 +132,7 @@ namespace ZG
                 job.translations = GetComponentLookup<Translation>();
                 job.rotations = GetComponentLookup<Rotation>();
                 job.physicsColliders = GetComponentLookup<PhysicsCollider>();
-                job.Run();
+                job.RunByRef();
 
                 return entityArray;
             }
@@ -163,24 +172,32 @@ namespace ZG
                         break;
                 }
 
-                int numChildren = children.Length,
-                    numColliderKeyBits = Math.GetHighestBit(numChildren), 
-                    numSizes = reader.isVail ? reader.Read<int>() : 0,
-                    numEntities = numSizes;
-                for (i = numSizes; i < numChildren; i++)
+                int numChildren = children.Length;
+                var colliderCounts =
+                    new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts);
+                
+                int numColliderKeyBits = Math.GetHighestBit(numChildren), 
+                    numSerializerEntites = 0, numColliderEntities = 0;
+                for (i = 0; i < numChildren; i++)
                 {
-                    if (children[i].Collider.Value.TotalNumColliderKeyBits + numColliderKeyBits > 32)
-                        ++numEntities;
+                    if (colliderCounts[i] > 0)
+                        ++numSerializerEntites;
+                    else if(children[i].Collider.Value.TotalNumColliderKeyBits + numColliderKeyBits > 32)
+                        ++numColliderEntities;
                 }
 
+                int numEntities = numSerializerEntites + numColliderEntities;
                 if (numEntities < numChildren)
                     ++numEntities;
 
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numEntities, allocator);
 
+                int numSizes = sizes.Length;
                 if (numSizes > 0)
                 {
+                    int entityCount = numEntities, entityIndex = 0, sizeIndex = 0, colliderCount, j;
                     Entity entity;
                     Translation translation;
                     Rotation rotation;
@@ -188,11 +205,22 @@ namespace ZG
                     CompoundCollider.ColliderBlobInstance child;
                     UnsafeBlock.Reader blockReader;
                     var assigner = new EntityComponentAssigner(Allocator.TempJob);
-                    var sizes = reader.ReadArray<int>(numSizes);
-                    for (i = 0; i < numSizes; ++i)
+                    for (i = 0; i < numChildren; ++i)
                     {
-                        entity = entityArray[i];
                         child = children[i];
+                        
+                        colliderCount = colliderCounts[i];
+                        if (colliderCount < 1)
+                        {
+                            children[i] = children[--entityCount];
+                            children[entityCount] = child;
+                            
+                            --i;
+                            
+                            continue;
+                        }
+
+                        entity = entityArray[entityIndex++];
 
                         translation.Value = child.CompoundFromChild.pos;
                         assigner.SetComponentData(entity, translation);
@@ -203,10 +231,19 @@ namespace ZG
                         physicsCollider.Value = child.Collider;
                         assigner.SetComponentData(entity, physicsCollider);
 
-                        blockReader = reader.ReadBlock(sizes[i]).reader;
-                        blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
-                    }
+                        for (j = 0; j < colliderCount; ++j)
+                        {
+                            if (sizeIndex >= numSizes)
+                                break;
+                            
+                            blockReader = reader.ReadBlock(sizes[sizeIndex++]).reader;
+                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
+                        }
 
+                        if (entityIndex == numSerializerEntites)
+                            break;
+                    }
+                    
                     assigner.Playback(ref this.GetState());
 
                     CompleteDependency();
@@ -214,14 +251,16 @@ namespace ZG
                     assigner.Dispose();
                 }
 
+                colliderCounts.Dispose();
+
                 CreateJob job;
                 job.numColliderKeyBits = numColliderKeyBits;
-                job.entityArray = entityArray.GetSubArray(numSizes, numEntities - numSizes);
-                job.children = children.AsArray().GetSubArray(numSizes, numChildren - numSizes);
+                job.entityArray = entityArray.GetSubArray(numSerializerEntites, numEntities - numSerializerEntites);
+                job.children = children.AsArray().GetSubArray(numSerializerEntites, numChildren - numSerializerEntites);
                 job.translations = GetComponentLookup<Translation>();
                 job.rotations = GetComponentLookup<Rotation>();
                 job.physicsColliders = GetComponentLookup<PhysicsCollider>();
-                job.Run();
+                job.RunByRef();
 
                 children.Dispose();
 
@@ -237,50 +276,60 @@ namespace ZG
                 reader.Deserialize(ref colliders);
 
                 int numColliders = colliders.Length;
-
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numColliders, allocator);
-
-                int numSizes = reader.isVail ? reader.Read<int>() : 0;
-                Entity entity;
-                Translation translation;
-                Rotation rotation;
-                PhysicsCollider physicsCollider;
-                UnsafeBlock.Reader blockReader;
-                var sizes = reader.ReadArray<int>(numSizes);
-                var assigner = new EntityComponentAssigner(Allocator.TempJob);
-                for (int i = 0; i < numColliders; ++i)
+                
+                var colliderCounts =
+                    new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts);
+                int numSizes = sizes.Length;
+                if (numSizes > 0)
                 {
-                    entity = entityArray[i];
+                    int sizeIndex = 0, colliderCount, j;
+                    Entity entity;
+                    Translation translation;
+                    Rotation rotation;
+                    PhysicsCollider physicsCollider;
+                    UnsafeBlock.Reader blockReader;
+                    var assigner = new EntityComponentAssigner(Allocator.TempJob);
+                    for (int i = 0; i < numColliders; ++i)
+                    {
+                        entity = entityArray[i];
 
 #if UNITY_EDITOR
-                    entityManager.SetName(entity, $"CompoundCollider {i} : {entity.Index}");
+                        entityManager.SetName(entity, $"CompoundCollider {i} : {entity.Index}");
 #endif
 
-                    translation.Value = float3.zero;
-                    assigner.SetComponentData(entity, translation);
+                        translation.Value = float3.zero;
+                        assigner.SetComponentData(entity, translation);
 
-                    rotation.Value = quaternion.identity;
-                    assigner.SetComponentData(entity, rotation);
+                        rotation.Value = quaternion.identity;
+                        assigner.SetComponentData(entity, rotation);
 
-                    physicsCollider.Value = colliders[i];
-                    assigner.SetComponentData(entity, physicsCollider);
+                        physicsCollider.Value = colliders[i];
+                        assigner.SetComponentData(entity, physicsCollider);
+                        
+                        colliderCount = colliderCounts[i];
+                        for (j = 0; j < colliderCount; ++j)
+                        {
+                            if (sizeIndex >= numSizes)
+                                break;
 
-                    if (i < numSizes)
-                    {
-                        blockReader = reader.ReadBlock(sizes[i]).reader;
-                        blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
+                            blockReader = reader.ReadBlock(sizes[sizeIndex++]).reader;
+                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity);
+                        }
                     }
+
+                    assigner.Playback(ref this.GetState());
+
+                    CompleteDependency();
+
+                    assigner.Dispose();
                 }
 
-                assigner.Playback(ref this.GetState());
-
-                CompleteDependency();
-
-                assigner.Dispose();
-
+                colliderCounts.Dispose();
                 colliders.Dispose();
-
+                
                 return entityArray;
             }
 
@@ -307,7 +356,7 @@ namespace ZG
                 CreateRightNowJob createRightNowJob;
                 createRightNowJob.children = children;
                 createRightNowJob.result = result;
-                createRightNowJob.Run();
+                createRightNowJob.RunByRef();
 
                 return result[0];
             }
@@ -335,6 +384,36 @@ namespace ZG
             return world.GetOrCreateSystemManaged<System>().Deserialize(ref reader, allocator);
         }
 
+        public static NativeArray<int> DeserializeDeserializers(this ref NativeBuffer.Reader reader, ref NativeArray<int> colliderCounts)
+        {
+            int numSizes = reader.isVail ? reader.Read<int>() : 0;
+            if (numSizes < 1)
+                return default;
+
+            var sizes = reader.ReadArray<int>(numSizes);
+
+            int offset = 0;
+            foreach (var size in sizes)
+                offset += size;
+
+            offset += reader.position;
+            if (offset < reader.length)
+            {
+                var position = reader.position;
+                reader.position = offset;
+                reader.ReadArray<int>(colliderCounts.Length).CopyTo(colliderCounts);
+                reader.position = position;
+            }
+            else
+            {
+                int numColliderCounts = colliderCounts.Length;
+                for (int i = 0; i < numColliderCounts; ++i)
+                    colliderCounts[i] = i < numSizes ? 1 : 0;
+            }
+
+            return sizes;
+        }
+        
         public static void SerializeSerializers(
             this ref NativeBuffer.Writer writer, 
             ICollection<IEntityDataStreamSerializer> serializers)
@@ -354,6 +433,49 @@ namespace ZG
                     sizes.Write(destination - source);
                     source = destination;
                 }
+            }
+        }
+        
+        public static void SerializeSerializers(
+            this ref NativeBuffer.Writer writer, 
+            int colliderCount, 
+            ICollection<KeyValuePair<ColliderKey, IEntityDataStreamSerializer>> serializers)
+        {
+            int numSerializers = serializers == null ? 0 : serializers.Count;
+            if (numSerializers > 0)
+            {
+                var serializersArray = new KeyValuePair<ColliderKey, IEntityDataStreamSerializer>[numSerializers];
+                serializers.CopyTo(serializersArray, 0);
+                Array.Sort(serializersArray, new Comparer());
+                
+                writer.Write(numSerializers);
+
+                int[] counts = null;
+                var sizes = writer.WriteBlock(sizeof(int) * numSerializers, false).writer;
+                ColliderKey key;
+                uint numSubKeyBits = (uint)Math.GetHighestBit(colliderCount), index;
+                int source = writer.position, destination;
+                foreach (var serializer in serializersArray)
+                {
+                    key = serializer.Key;
+                    if (key.PopSubKey(numSubKeyBits, out index))
+                    {
+                        if(counts == null || counts.Length <= index)
+                            Array.Resize(ref counts, (int)index + 1);
+
+                        ++counts[index];
+                    }
+                    
+                    serializer.Value.Serialize(ref writer);
+                    writer.Write(key);
+
+                    destination = writer.position;
+                    sizes.Write(destination - source);
+                    source = destination;
+                }
+                
+                if(counts != null)
+                    writer.Write(counts);
             }
         }
 
@@ -396,6 +518,22 @@ namespace ZG
 
         }
 
+        public static void SerializeColliderBlobInstances(
+            this ref NativeBuffer.Writer writer, 
+            in NativeArray<CompoundCollider.ColliderBlobInstance> colliderBlobInstances, 
+            ICollection<KeyValuePair<ColliderKey, IEntityDataStreamSerializer>> serializers)
+        {
+            int numSerializers = serializers == null ? 0 : serializers.Count;
+            if (numSerializers > 0)
+            {
+                writer.SerializeColliderBlobInstances(colliderBlobInstances);
+
+                SerializeSerializers(ref writer, colliderBlobInstances.Length, serializers);
+            }
+            else
+                writer.SerializeColliderBlobInstances(colliderBlobInstances);
+        }
+
         public static void SerializeColliders(
             this ref NativeBuffer.Writer writer,
             in NativeArray<BlobAssetReference<Collider>> source,
@@ -432,7 +570,22 @@ namespace ZG
             }
             else
                 writer.SerializeColliders(source);
+        }
+        
+        public static void SerializeColliders(
+            this ref NativeBuffer.Writer writer,
+            in NativeArray<BlobAssetReference<Collider>> colliders,
+            ICollection<KeyValuePair<ColliderKey, IEntityDataStreamSerializer>> serializers)
+        {
+            int numSerializers = serializers == null ? 0 : serializers.Count;
+            if (numSerializers > 0)
+            {
+                writer.SerializeColliders(colliders);
 
+                SerializeSerializers(ref writer, colliders.Length, serializers);
+            }
+            else
+                writer.SerializeColliders(colliders);
         }
     }
 }

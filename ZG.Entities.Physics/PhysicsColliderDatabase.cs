@@ -124,7 +124,7 @@ namespace ZG
 
         public BlobAssetReference<Unity.Physics.Collider> collider => __collider;
 
-        public static PhysicsColliderDatabase Create(in NativeArray<CompoundCollider.ColliderBlobInstance> colliderBlobInstances, IDictionary<int, IEntityDataStreamSerializer> serializers)
+        public static PhysicsColliderDatabase Create(in NativeArray<CompoundCollider.ColliderBlobInstance> colliderBlobInstances, IDictionary<ColliderKey, IEntityDataStreamSerializer> serializers)
         {
             PhysicsColliderDatabase result = CreateInstance<PhysicsColliderDatabase>();
 
@@ -141,7 +141,7 @@ namespace ZG
             return result;
         }
 
-        public static PhysicsColliderDatabase Create(in NativeArray<BlobAssetReference<Unity.Physics.Collider>> colliders, IDictionary<int, IEntityDataStreamSerializer> serializers)
+        public static PhysicsColliderDatabase Create(in NativeArray<BlobAssetReference<Unity.Physics.Collider>> colliders, IDictionary<ColliderKey, IEntityDataStreamSerializer> serializers)
         {
             PhysicsColliderDatabase result = CreateInstance<PhysicsColliderDatabase>();
 
@@ -158,7 +158,7 @@ namespace ZG
             return result;
         }
 
-        public static unsafe PhysicsColliderDatabase Create(IDictionary<int, IEntityDataStreamSerializer> serializers, params BlobAssetReference<Unity.Physics.Collider>[] colliders)
+        public static unsafe PhysicsColliderDatabase Create(IDictionary<ColliderKey, IEntityDataStreamSerializer> serializers, params BlobAssetReference<Unity.Physics.Collider>[] colliders)
         {
             fixed (void* ptr = colliders)
             {

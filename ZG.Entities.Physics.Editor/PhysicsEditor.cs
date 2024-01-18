@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using Unity.Collections;
+using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Authoring;
 using UnityEngine;
@@ -66,11 +67,15 @@ namespace ZG
             shapes.Convert(results, transform, groupIndex, 0, 0, isBaked, true);
         }
 
-        public static void Serialize(
+        public static Dictionary<ColliderKey, IEntityDataStreamSerializer> Serialize(
             ref NativeList<CompoundCollider.ColliderBlobInstance> colliderBlobInstances,
-            GameObject gameObject,
-            Dictionary<int, IEntityDataStreamSerializer> serializers = null)
+            GameObject gameObject, 
+            Dictionary<ColliderKey, IEntityDataStreamSerializer> serializers)
         {
+            if(serializers == null)
+                serializers = new Dictionary<ColliderKey, IEntityDataStreamSerializer>();
+            
+            var shapes = gameObject.GetComponentsInChildren<PhysicsShapeAuthoring>();
             var colliders = gameObject.GetComponentsInChildren<UnityEngine.Collider>();
 
             /*using (var memoryStream = new MemoryStream())
@@ -103,60 +108,53 @@ namespace ZG
 
             List<IEntityDataStreamSerializer> serializersTemp = null;
             EntityDataStreamSerializer serializer;
-            int numColliders = colliders.Length;
+            ColliderKey colliderKey;
+            int numColliders = colliders.Length, numShapes = shapes.Length;
+            uint numSubKeyBits = 32 - (uint)math.lzcnt(numColliders + numShapes);
 
-            if (serializers != null)
+            for (int i = 0; i < numColliders; ++i)
             {
-                for (int i = 0; i < numColliders; ++i)
+                if (serializersTemp == null)
+                    serializersTemp = new List<IEntityDataStreamSerializer>();
+
+                colliders[i].GetComponents(serializersTemp);
+
+                if (serializersTemp.Count > 0)
                 {
-                    if (serializersTemp == null)
-                        serializersTemp = new List<IEntityDataStreamSerializer>();
+                    serializer = new EntityDataStreamSerializer();
+                    serializer.children = serializersTemp;
 
-                    colliders[i].GetComponents(serializersTemp);
+                    colliderKey = ColliderKey.Empty;
+                    colliderKey.PushSubKey(numSubKeyBits, (uint)i);
+                    serializers[colliderKey] = serializer;
 
-                    if (serializersTemp.Count > 0)
-                    {
-                        serializer = new EntityDataStreamSerializer();
-                        serializer.children = serializersTemp;
-
-                        if (serializers == null)
-                            serializers = new Dictionary<int, IEntityDataStreamSerializer>();
-
-                        serializers[i] = serializer;
-
-                        serializersTemp = null;
-                    }
+                    serializersTemp = null;
                 }
             }
-
-            var shapes = gameObject.GetComponentsInChildren<PhysicsShapeAuthoring>();
 
             shapes.Convert(colliderBlobInstances, null, 0, 0, 0, true, true);
 
-            if (serializers != null)
+            for (int i = 0; i < numShapes; ++i)
             {
-                int numShapes = shapes.Length;
-                for (int i = 0; i < numShapes; ++i)
+                if (serializersTemp == null)
+                    serializersTemp = new List<IEntityDataStreamSerializer>();
+
+                shapes[i].GetComponents(serializersTemp);
+
+                if (serializersTemp.Count > 0)
                 {
-                    if (serializersTemp == null)
-                        serializersTemp = new List<IEntityDataStreamSerializer>();
+                    serializer = new EntityDataStreamSerializer();
+                    serializer.children = serializersTemp;
 
-                    shapes[i].GetComponents(serializersTemp);
+                    colliderKey = ColliderKey.Empty;
+                    colliderKey.PushSubKey(numSubKeyBits, (uint)(i + numColliders));
+                    serializers[colliderKey] = serializer;
 
-                    if (serializersTemp.Count > 0)
-                    {
-                        serializer = new EntityDataStreamSerializer();
-                        serializer.children = serializersTemp;
-
-                        if (serializers == null)
-                            serializers = new Dictionary<int, IEntityDataStreamSerializer>();
-
-                        serializers[i + numColliders] = serializer;
-
-                        serializersTemp = null;
-                    }
+                    serializersTemp = null;
                 }
             }
+
+            return serializers;
         }
 
         [MenuItem("GameObject/ZG/Physics/Filter Colliders", false, 10)]
@@ -270,7 +268,7 @@ namespace ZG
             if (string.IsNullOrEmpty(path))
                 return;
 
-            var serializers = new Dictionary<int, IEntityDataStreamSerializer>();
+            var serializers = new Dictionary<ColliderKey, IEntityDataStreamSerializer>();
 
             var colliderBlobInstances = new NativeList<CompoundCollider.ColliderBlobInstance>(Allocator.TempJob);
             {
