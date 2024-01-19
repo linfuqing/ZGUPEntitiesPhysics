@@ -46,7 +46,7 @@ namespace ZG
         [BurstCompile(CompileSynchronously = true, FloatMode = FloatMode.Deterministic)]
         private struct CreateJob : IJob
         {
-            public int numColliderKeyBits;
+            public uint numColliderKeyBits;
 
             [ReadOnly]
             public NativeArray<Entity> entityArray;
@@ -115,7 +115,8 @@ namespace ZG
                 Allocator allocator, 
                 in NativeArray<CompoundCollider.ColliderBlobInstance> children)
             {
-                int i, numEntities = 0, numChildren = children.Length, numColliderKeyBits = Math.GetHighestBit(numChildren);
+                int i, numEntities = 0, numChildren = children.Length;
+                uint numColliderKeyBits = (uint)Math.GetHighestBit(numChildren);
                 for (i = 0; i < numChildren; i++)
                 {
                     if (children[i].Collider.Value.TotalNumColliderKeyBits + numColliderKeyBits > 32)
@@ -175,12 +176,25 @@ namespace ZG
                 }
 
                 int numChildren = children.Length;
-                var colliderCounts =
-                    new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts, out var colliderKeys);
+                uint numColliderKeyBits = (uint)Math.GetHighestBit(numChildren), colliderIndex;
+                var sizes = DeserializeDeserializers(ref reader, out var colliderKeys);
+                int numSizes = sizes.Length;
+                var colliderCounts = new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                if (colliderKeys.IsCreated)
+                {
+                    foreach (var colliderKey in colliderKeys)
+                    {
+                        if (colliderKey.PopSubKey(numColliderKeyBits, out colliderIndex))
+                            ++colliderCounts[(int)colliderIndex];
+                    }
+                }
+                else
+                {
+                    for (i = 0; i < numSizes; ++i)
+                        colliderCounts[i] = 1;
+                }
                 
-                int numColliderKeyBits = Math.GetHighestBit(numChildren), 
-                    numSerializerEntites = 0, numColliderEntities = 0;
+                int numSerializerEntites = 0, numColliderEntities = 0;
                 for (i = 0; i < numChildren; i++)
                 {
                     if (colliderCounts[i] > 0)
@@ -196,10 +210,9 @@ namespace ZG
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numEntities, allocator);
 
-                int numSizes = sizes.Length;
                 if (numSizes > 0)
                 {
-                    int entityCount = numEntities, entityIndex = 0, sizeIndex = 0, colliderCount, j;
+                    int entityCount = numEntities, previousIndex = -1, colliderCount;
                     Entity entity;
                     ColliderKey colliderKey;
                     Translation translation;
@@ -207,8 +220,10 @@ namespace ZG
                     PhysicsCollider physicsCollider;
                     CompoundCollider.ColliderBlobInstance child;
                     UnsafeBlock.Reader blockReader;
+                    var colliderIndices =
+                        new NativeArray<int>(numChildren, Allocator.Temp, NativeArrayOptions.ClearMemory);
                     var assigner = new EntityComponentAssigner(Allocator.TempJob);
-                    for (i = 0; i < numChildren; ++i)
+                    for (i = 0; i < entityCount; ++i)
                     {
                         child = children[i];
                         
@@ -217,13 +232,18 @@ namespace ZG
                         {
                             children[i] = children[--entityCount];
                             children[entityCount] = child;
-                            
-                            --i;
+
+                            colliderIndices[entityCount] = previousIndex < i ? i : colliderIndices[i];
+                            colliderIndices[i] = entityCount;
+
+                            previousIndex = i--;
                             
                             continue;
                         }
+                        
+                        colliderIndices[i] = i;
 
-                        entity = entityArray[entityIndex++];
+                        entity = entityArray[i];
 
                         translation.Value = child.CompoundFromChild.pos;
                         assigner.SetComponentData(entity, translation);
@@ -233,35 +253,36 @@ namespace ZG
 
                         physicsCollider.Value = child.Collider;
                         assigner.SetComponentData(entity, physicsCollider);
-
-                        for (j = 0; j < colliderCount; ++j)
+                        
+                        previousIndex = i;
+                    }
+                    
+                    UnityEngine.Assertions.Assert.AreEqual(numSerializerEntites, entityCount);
+                    
+                    for (i = 0; i < numSizes; ++i)
+                    {
+                        if (colliderKeys.IsCreated)
                         {
-                            if (sizeIndex >= numSizes)
-                                break;
-
-                            if (colliderKeys.IsCreated)
-                            {
-                                colliderKey = colliderKeys[sizeIndex];
-                                if (!colliderKey.PopSubKey((uint)numColliderKeyBits, out _))
-                                    colliderKey = ColliderKey.Empty;
-                            }
-                            else
-                                colliderKey = ColliderKey.Empty;
-
-                            blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
-                            blockReader.DeserializeStream(
-                                ref entityManager, 
-                                ref assigner, 
-                                entity, 
-                                colliderKey.Equals(ColliderKey.Empty) ? 
-                                    default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
-
-                            ++sizeIndex;
+                            colliderKey = colliderKeys[i];
+                            if (!colliderKey.PopSubKey(numColliderKeyBits, out colliderIndex))
+                                continue;
+                        }
+                        else
+                        {
+                            colliderIndex = (uint)i;
+                            
+                            colliderKey = ColliderKey.Empty;
                         }
 
-                        if (entityIndex == numSerializerEntites)
-                            break;
+                        blockReader = reader.ReadBlock(sizes[i]).reader;
+                        blockReader.DeserializeStream(
+                            ref entityManager, 
+                            ref assigner, entityArray[colliderIndices[(int)colliderIndex]], 
+                            colliderKey.Equals(ColliderKey.Empty) ? 
+                                default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                     }
+
+                    colliderIndices.Dispose();
                     
                     assigner.Playback(ref this.GetState());
 
@@ -298,14 +319,12 @@ namespace ZG
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numColliders, allocator);
                 
-                var colliderCounts =
-                    new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                var sizes = DeserializeDeserializers(ref reader, ref colliderCounts, out var colliderKeys);
+                /*var colliderCounts =
+                    new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.ClearMemory);*/
+                var sizes = DeserializeDeserializers(ref reader, out var colliderKeys);
                 int numSizes = sizes.Length;
                 if (numSizes > 0)
                 {
-                    int sizeIndex = 0, colliderCount, j;
-                    uint numColliderKeyBits = (uint)Math.GetHighestBit(numColliders);
                     Entity entity;
                     ColliderKey colliderKey;
                     Translation translation;
@@ -329,31 +348,32 @@ namespace ZG
 
                         physicsCollider.Value = colliders[i];
                         assigner.SetComponentData(entity, physicsCollider);
-                        
-                        colliderCount = colliderCounts[i];
-                        for (j = 0; j < colliderCount; ++j)
-                        {
-                            if (sizeIndex >= numSizes)
-                                break;
-                            
-                            if (colliderKeys.IsCreated)
-                            {
-                                colliderKey = colliderKeys[sizeIndex];
-                                if (!colliderKey.PopSubKey(numColliderKeyBits, out _))
-                                    colliderKey = ColliderKey.Empty;
-                            }
-                            else
-                                colliderKey = ColliderKey.Empty;
-
-                            blockReader = reader.ReadBlock(sizes[sizeIndex]).reader;
-                            blockReader.DeserializeStream(ref entityManager, ref assigner, entity, 
-                                colliderKey.Equals(ColliderKey.Empty) ? 
-                                    default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
-
-                            ++sizeIndex;
-                        }
                     }
 
+                    uint numColliderKeyBits = (uint)Math.GetHighestBit(numColliders), colliderIndex;
+                    for (int i = 0; i < numSizes; ++i)
+                    {
+                        if (colliderKeys.IsCreated)
+                        {
+                            colliderKey = colliderKeys[i];
+                            if (!colliderKey.PopSubKey(numColliderKeyBits, out colliderIndex))
+                                continue;
+                        }
+                        else
+                        {
+                            colliderIndex = (uint)i;
+                            
+                            colliderKey = ColliderKey.Empty;
+                        }
+
+                        blockReader = reader.ReadBlock(sizes[i]).reader;
+                        blockReader.DeserializeStream(
+                            ref entityManager, 
+                            ref assigner, entityArray[(int)colliderIndex], 
+                            colliderKey.Equals(ColliderKey.Empty) ? 
+                                default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
+                    }
+                    
                     assigner.Playback(ref this.GetState());
 
                     CompleteDependency();
@@ -361,7 +381,7 @@ namespace ZG
                     assigner.Dispose();
                 }
 
-                colliderCounts.Dispose();
+                //colliderCounts.Dispose();
                 colliders.Dispose();
                 
                 return entityArray;
@@ -420,7 +440,7 @@ namespace ZG
 
         public static NativeArray<int> DeserializeDeserializers<T>(
             this ref T reader, 
-            ref NativeArray<int> colliderCounts, 
+            //ref NativeArray<int> colliderCounts, 
             out NativeArray<ColliderKey> colliderKeys) where T : struct, INativeReader
         {
             int numSizes = reader.isVail ? reader.Read<int>() : 0;
@@ -448,7 +468,7 @@ namespace ZG
             else
                 colliderKeys = default;
 
-            if (colliderKeys.IsCreated && colliderCounts.IsCreated)
+            /*if (colliderKeys.IsCreated && colliderCounts.IsCreated)
             {
                 uint numSubKeyBits = (uint)Math.GetHighestBit(colliderCounts.Length), colliderIndex;
                 for (int i = 0; i < numSizes; ++i)
@@ -456,7 +476,7 @@ namespace ZG
                     if (colliderKeys[i].PopSubKey(numSubKeyBits, out colliderIndex))
                         colliderCounts.Increment((int)colliderIndex);
                 }
-            }
+            }*/
 
             return sizes;
         }

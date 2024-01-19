@@ -8,6 +8,7 @@ using Unity.Physics;
 using UnityEngine;
 using ZG.Unsafe;
 using ZG.Mathematics;
+using Math = ZG.Mathematics.Math;
 
 namespace ZG
 {
@@ -188,14 +189,25 @@ namespace ZG
 
                     var componentTypes = new NativeList<ComponentType>(Allocator.Temp);
 
-                    NativeArray<int> colliderCounts = default;
-                    var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
-
+                    //NativeArray<int> colliderCounts = default;
+                    var sizes = reader.DeserializeDeserializers(out var colliderKeys);
+                    ColliderKey colliderKey;
+                    uint numColliderKeyBits = (uint)Math.GetLowerstBit(__colliderCount);
+                    int numSizes = sizes.Length;
                     UnsafeBlock.Reader blockReader;
-                    foreach (var size in sizes)
+                    for(int i = 0; i < numSizes; ++i)
                     {
-                        blockReader = reader.ReadBlock(size).reader;
-                        blockReader.DeserializeStream(ref componentTypes, colliderKeys.Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
+                        if (colliderKeys.IsCreated)
+                        {
+                            colliderKey = colliderKeys[i];
+                            if (!colliderKey.PopSubKey(numColliderKeyBits, out _))
+                                continue;
+                        }
+                        else
+                            colliderKey = ColliderKey.Empty;
+
+                        blockReader = reader.ReadBlock(sizes[i]).reader;
+                        blockReader.DeserializeStream(ref componentTypes, colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                     }
 
                     int numComponentTypes = componentTypes.Length;
@@ -234,25 +246,24 @@ namespace ZG
                 var buffer = new UnsafeBlock((UnsafeAppendBuffer*)UnsafeUtility.AddressOf(ref appendBuffer), 0, length);
                 var reader = buffer.reader;
 
-                var colliderCounts = new NativeArray<int>(__colliderCount, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                var sizes = reader.DeserializeDeserializers(ref colliderCounts, out var colliderKeys);
-                colliderCounts.Dispose();
-                
+                var sizes = reader.DeserializeDeserializers(out var colliderKeys);
+
                 int numSizes = sizes.Length;
+                uint numColliderKeyBits = (uint)Math.GetLowerstBit(__colliderCount);
                 ColliderKey colliderKey;
                 UnsafeBlock.Reader blockReader;
                 for(int i = 0; i < numSizes; ++i)
                 {
-                    blockReader = reader.ReadBlock(sizes[i]).reader;
-
                     if (colliderKeys.IsCreated)
                     {
                         colliderKey = colliderKeys[i];
-                        if (!colliderKey.PopSubKey((uint)__colliderCount, out _))
-                            colliderKey = ColliderKey.Empty;
+                        if (!colliderKey.PopSubKey(numColliderKeyBits, out _))
+                            continue;
                     }
                     else
                         colliderKey = ColliderKey.Empty;
+
+                    blockReader = reader.ReadBlock(sizes[i]).reader;
 
                     blockReader.DeserializeStream(
                         ref assigner, 
