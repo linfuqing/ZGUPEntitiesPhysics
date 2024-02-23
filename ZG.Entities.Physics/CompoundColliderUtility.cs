@@ -318,68 +318,65 @@ namespace ZG
                 int numColliders = colliders.Length;
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numColliders, allocator);
-                
+           
+                Entity entity;
+                ColliderKey colliderKey;
+                Translation translation;
+                Rotation rotation;
+                PhysicsCollider physicsCollider;
+                UnsafeBlock.Reader blockReader;
+                var assigner = new EntityComponentAssigner(Allocator.TempJob);
+                for (int i = 0; i < numColliders; ++i)
+                {
+                    entity = entityArray[i];
+
+#if UNITY_EDITOR
+                    entityManager.SetName(entity, $"CompoundCollider {i} : {entity.Index}");
+#endif
+
+                    translation.Value = float3.zero;
+                    assigner.SetComponentData(entity, translation);
+
+                    rotation.Value = quaternion.identity;
+                    assigner.SetComponentData(entity, rotation);
+
+                    physicsCollider.Value = colliders[i];
+                    assigner.SetComponentData(entity, physicsCollider);
+                }
+     
                 /*var colliderCounts =
                     new NativeArray<int>(numColliders, Allocator.Temp, NativeArrayOptions.ClearMemory);*/
                 var sizes = DeserializeDeserializers(ref reader, out var colliderKeys);
                 int numSizes = sizes.Length;
-                if (numSizes > 0)
+                uint numColliderKeyBits = (uint)Math.GetHighestBit(numColliders), colliderIndex;
+                for (int i = 0; i < numSizes; ++i)
                 {
-                    Entity entity;
-                    ColliderKey colliderKey;
-                    Translation translation;
-                    Rotation rotation;
-                    PhysicsCollider physicsCollider;
-                    UnsafeBlock.Reader blockReader;
-                    var assigner = new EntityComponentAssigner(Allocator.TempJob);
-                    for (int i = 0; i < numColliders; ++i)
+                    if (colliderKeys.IsCreated)
                     {
-                        entity = entityArray[i];
-
-#if UNITY_EDITOR
-                        entityManager.SetName(entity, $"CompoundCollider {i} : {entity.Index}");
-#endif
-
-                        translation.Value = float3.zero;
-                        assigner.SetComponentData(entity, translation);
-
-                        rotation.Value = quaternion.identity;
-                        assigner.SetComponentData(entity, rotation);
-
-                        physicsCollider.Value = colliders[i];
-                        assigner.SetComponentData(entity, physicsCollider);
+                        colliderKey = colliderKeys[i];
+                        if (!colliderKey.PopSubKey(numColliderKeyBits, out colliderIndex))
+                            continue;
+                    }
+                    else
+                    {
+                        colliderIndex = (uint)i;
+                        
+                        colliderKey = ColliderKey.Empty;
                     }
 
-                    uint numColliderKeyBits = (uint)Math.GetHighestBit(numColliders), colliderIndex;
-                    for (int i = 0; i < numSizes; ++i)
-                    {
-                        if (colliderKeys.IsCreated)
-                        {
-                            colliderKey = colliderKeys[i];
-                            if (!colliderKey.PopSubKey(numColliderKeyBits, out colliderIndex))
-                                continue;
-                        }
-                        else
-                        {
-                            colliderIndex = (uint)i;
-                            
-                            colliderKey = ColliderKey.Empty;
-                        }
-
-                        blockReader = reader.ReadBlock(sizes[i]).reader;
-                        blockReader.DeserializeStream(
-                            ref entityManager, 
-                            ref assigner, entityArray[(int)colliderIndex], 
-                            colliderKey.Equals(ColliderKey.Empty) ? 
-                                default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
-                    }
-                    
-                    assigner.Playback(ref this.GetState());
-
-                    CompleteDependency();
-
-                    assigner.Dispose();
+                    blockReader = reader.ReadBlock(sizes[i]).reader;
+                    blockReader.DeserializeStream(
+                        ref entityManager, 
+                        ref assigner, entityArray[(int)colliderIndex], 
+                        colliderKey.Equals(ColliderKey.Empty) ? 
+                            default : colliderKey.ToNativeArray().Reinterpret<byte>(UnsafeUtility.SizeOf<ColliderKey>()));
                 }
+                
+                assigner.Playback(ref this.GetState());
+
+                CompleteDependency();
+
+                assigner.Dispose();
 
                 //colliderCounts.Dispose();
                 colliders.Dispose();
