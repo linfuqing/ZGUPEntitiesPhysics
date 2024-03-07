@@ -11,8 +11,12 @@ namespace ZG
     [EntityComponent(typeof(Translation))]
     [EntityComponent(typeof(Rotation))]
     [EntityComponent(typeof(PhysicsCollider))]
+    [EntityComponent(typeof(PhysicsCustomTags))]
     public class PhysicsColliderComponent : EntityProxyComponent, IEntityComponent, IPhysicsComponent
     {
+        [SerializeField]
+        internal byte _customTags = byte.MaxValue;
+        
         [SerializeField]
         internal PhysicsColliderDatabase _database;
 
@@ -108,6 +112,10 @@ namespace ZG
             PhysicsCollider physicsCollider;
             physicsCollider.Value = _database.collider;
             assigner.SetComponentData(entity, physicsCollider);
+
+            PhysicsCustomTags physicsCustomTags;
+            physicsCustomTags.Value = _customTags;
+            assigner.SetComponentData(entity, physicsCustomTags);
 
             _database.Init(entity, ref assigner);
         }

@@ -9,6 +9,7 @@ namespace ZG
     [EntityComponent(typeof(Translation))]
     [EntityComponent(typeof(Rotation))]
     [EntityComponent(typeof(PhysicsCollider))]
+    [EntityComponent(typeof(PhysicsCustomTags))]
     [EntityComponent(typeof(PhysicsShapeCompoundCollider))]
     [EntityComponent(typeof(PhysicsShapeChild))]
     [EntityComponent(typeof(PhysicsShapeDestroiedCollider))]
@@ -19,6 +20,9 @@ namespace ZG
     [EntityComponent(typeof(PhysicsHierarchyInactiveColliders))]
     public class PhysicsHierarchyComponent : EntityProxyComponent, IEntityComponent, IPhysicsComponent
     {
+        [UnityEngine.SerializeField]
+        internal byte _customTags = 1;
+
         [UnityEngine.SerializeField]
         internal PhysicsHierarchyDatabase _database;
 
@@ -112,10 +116,14 @@ namespace ZG
             translation.Value = transform.position;
             assigner.SetComponentData(entity, translation);
 
-            //±ØÐë
+            //ï¿½ï¿½ï¿½ï¿½
             Rotation rotation;
             rotation.Value = transform.rotation;
             assigner.SetComponentData(entity, rotation);*/
+
+            PhysicsCustomTags physicsCustomTags;
+            physicsCustomTags.Value = _customTags;
+            assigner.SetComponentData(entity, physicsCustomTags);
 
             PhysicsHierarchyData instance;
             instance.definition = _database.definition;

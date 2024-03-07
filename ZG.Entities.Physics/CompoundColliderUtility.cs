@@ -57,9 +57,13 @@ namespace ZG
             public ComponentLookup<Translation> translations;
             public ComponentLookup<Rotation> rotations;
             public ComponentLookup<PhysicsCollider> physicsColliders;
+            public ComponentLookup<PhysicsCustomTags> physicsCustomTags;
 
             public void Execute()
             {
+                PhysicsCustomTags physicsCustomTags;
+                physicsCustomTags.Value = byte.MaxValue;
+                
                 int entityIndex = 0, childIndex = 0, numChildren = children.Length, numEntities = entityArray.Length;
                 Entity entity;
                 Translation translation;
@@ -83,6 +87,8 @@ namespace ZG
 
                         physicsCollider.Value = child.Collider;
                         physicsColliders[entity] = physicsCollider;
+                        
+                        this.physicsCustomTags[entity] = physicsCustomTags;
                     }
                     else
                         results[childIndex++] = child;
@@ -101,6 +107,8 @@ namespace ZG
                     physicsCollider.Value = CompoundCollider.Create(results);
                     physicsColliders[entity] = physicsCollider;
 
+                    this.physicsCustomTags[entity] = physicsCustomTags;
+                    
                     results.Dispose();
                 }
             }
@@ -135,6 +143,7 @@ namespace ZG
                 job.translations = GetComponentLookup<Translation>();
                 job.rotations = GetComponentLookup<Rotation>();
                 job.physicsColliders = GetComponentLookup<PhysicsCollider>();
+                job.physicsCustomTags = GetComponentLookup<PhysicsCustomTags>();
                 job.RunByRef();
 
                 return entityArray;
@@ -212,6 +221,9 @@ namespace ZG
 
                 if (numSizes > 0)
                 {
+                    PhysicsCustomTags physicsCustomTags;
+                    physicsCustomTags.Value = byte.MaxValue;
+
                     int entityCount = numEntities, previousIndex = -1, colliderCount;
                     Entity entity;
                     ColliderKey colliderKey;
@@ -253,6 +265,8 @@ namespace ZG
 
                         physicsCollider.Value = child.Collider;
                         assigner.SetComponentData(entity, physicsCollider);
+
+                        assigner.SetComponentData(entity, physicsCustomTags);
                         
                         previousIndex = i;
                     }
@@ -300,6 +314,7 @@ namespace ZG
                 job.translations = GetComponentLookup<Translation>();
                 job.rotations = GetComponentLookup<Rotation>();
                 job.physicsColliders = GetComponentLookup<PhysicsCollider>();
+                job.physicsCustomTags = GetComponentLookup<PhysicsCustomTags>();
                 job.RunByRef();
 
                 children.Dispose();
@@ -319,6 +334,9 @@ namespace ZG
                 var entityManager = EntityManager;
                 var entityArray = entityManager.CreateEntity(__entityArchetype, numColliders, allocator);
            
+                PhysicsCustomTags physicsCustomTags;
+                physicsCustomTags.Value = byte.MaxValue;
+                
                 Entity entity;
                 ColliderKey colliderKey;
                 Translation translation;
@@ -342,6 +360,8 @@ namespace ZG
 
                     physicsCollider.Value = colliders[i];
                     assigner.SetComponentData(entity, physicsCollider);
+                    
+                    assigner.SetComponentData(entity, physicsCustomTags);
                 }
      
                 /*var colliderCounts =
@@ -391,7 +411,8 @@ namespace ZG
                 __entityArchetype = EntityManager.CreateArchetype(
                     ComponentType.ReadOnly<Translation>(),
                     ComponentType.ReadOnly<Rotation>(),
-                    ComponentType.ReadOnly<PhysicsCollider>());
+                    ComponentType.ReadOnly<PhysicsCollider>(),
+                    ComponentType.ReadOnly<PhysicsCustomTags>());
             }
 
             protected override void OnUpdate()

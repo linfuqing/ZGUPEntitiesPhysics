@@ -591,6 +591,7 @@ namespace ZG
             int rigidBodyIndex)
         {
             bool bodyIsDynamic = 0 <= rigidBodyIndex && rigidBodyIndex < world.dynamicBodyCount;
+            int priority = world.collisionWorld.Bodies[rigidBodyIndex].CustomTags;
             return new SurfaceConstraintInfo()
             {
                 ColliderKey = colliderKey,
@@ -605,7 +606,7 @@ namespace ZG
                     float3.zero,
                 VerticalComponent = verticalComponent, 
                 RigidBodyIndex = rigidBodyIndex, 
-                Priority = bodyIsDynamic ? 1 : 0
+                Priority = bodyIsDynamic ? math.max(1, priority) : math.min(-priority, 0)
             };
         }
 
