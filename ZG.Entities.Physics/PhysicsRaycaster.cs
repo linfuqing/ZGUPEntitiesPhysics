@@ -94,7 +94,7 @@ namespace ZG.Entities.Physics
             public EntityTypeHandle entityType;
             [ReadOnly]
             public ComponentTypeHandle<PhysicsShapeCompoundCollider> compoundColliderType;
-            public ComponentTypeHandle<PhysicsRaycastColliderToIgnore> raycastColliderToIgnoreType;
+            //public ComponentTypeHandle<PhysicsRaycastColliderToIgnore> raycastColliderToIgnoreType;
 
             public SharedList<PhysicsRaycaster.Collider>.ParallelWriter collidersToIgnore;
 
@@ -113,7 +113,7 @@ namespace ZG.Entities.Physics
                 {
                     raycast.Execute(i);
 
-                    chunk.SetComponentEnabled(ref raycastColliderToIgnoreType, i, false);
+                    //chunk.SetComponentEnabled(ref raycastColliderToIgnoreType, i, false);
                 }
             }
         }
@@ -146,7 +146,7 @@ namespace ZG.Entities.Physics
 
             __entityType = state.GetEntityTypeHandle();
             __compoundColliderType = state.GetComponentTypeHandle<PhysicsShapeCompoundCollider>(true);
-            __raycastColliderToIgnoreType = state.GetComponentTypeHandle<PhysicsRaycastColliderToIgnore>();
+            __raycastColliderToIgnoreType = state.GetComponentTypeHandle<PhysicsRaycastColliderToIgnore>(true);
 
             collidersToIgnore = new SharedList<PhysicsRaycaster.Collider>(Allocator.Persistent);
         }
@@ -183,7 +183,7 @@ namespace ZG.Entities.Physics
             raycast.collidersToIgnore = collidersToIgnore.parallelWriter;
             raycast.entityType = __entityType.UpdateAsRef(ref state);
             raycast.compoundColliderType = compoundColliderType;
-            raycast.raycastColliderToIgnoreType = raycastColliderToIgnoreType;
+            //raycast.raycastColliderToIgnoreType = raycastColliderToIgnoreType;
 
             jobHandle = raycast.ScheduleParallelByRef(__group, jobHandle);
 
