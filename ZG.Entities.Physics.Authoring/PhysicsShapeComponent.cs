@@ -951,7 +951,27 @@ namespace ZG
             }
         }
 
-        public CompoundCollider.ColliderBlobInstance mainCollider => colliders[0];
+        public CompoundCollider.ColliderBlobInstance mainCollider
+        {
+            get
+            {
+                var colliders = this.colliders;
+                int numTriggers = __triggers == null ? 0 : __triggers.Count;
+                if (numTriggers < 1)
+                    return colliders[0];
+                
+                int triggerIndex = 1, colliderIndex = __triggers[0].index, numColliders = colliders.length;
+                for (int i = 0; i < numColliders; ++i)
+                {
+                    if (colliderIndex == i)
+                        colliderIndex = triggerIndex < numTriggers ? __triggers[triggerIndex++].index : -1;
+                    else
+                        return colliders[i];
+                }
+
+                return default;
+            }
+        }
 
         public
 #if UNITY_EDITOR
