@@ -688,9 +688,9 @@ namespace ZG
             __bitFields = state.GetComponentLookup<PhysicsHierarchyTriggersBitField>();
             __parents = state.GetComponentLookup<PhysicsShapeParent>();
 
-            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.instance;
-
             __prefabs = state.WorldUnmanaged.GetExistingSystemUnmanaged<PhysicsHierarchyTriggerFactorySystem>().prefabs;
+
+            __colliders = SingletonAssetContainer<BlobAssetReference<Collider>>.Retain();
 
             __triggerCount = new NativeArray<int>(1, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
             __triggerEntitiesToCreate = new NativeParallelMultiHashMap<Key, Entity>(1, Allocator.Persistent);
@@ -714,6 +714,8 @@ namespace ZG
             __triggerEntitiesToCreate.Dispose();
             __triggerEntityOffsets.Dispose();
             __triggerCount.Dispose();
+            
+            __colliders.Release();
         }
 
         [BurstCompile]

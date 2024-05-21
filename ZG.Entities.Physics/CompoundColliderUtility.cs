@@ -324,10 +324,9 @@ namespace ZG
 
             public NativeArray<Entity> Deserialize(
                 ref NativeBuffer.Reader reader,
+                ref NativeList<BlobAssetReference<Collider>> colliders, 
                 Allocator allocator)
             {
-                var colliders = new NativeList<BlobAssetReference<Collider>>(Allocator.Temp);
-
                 reader.Deserialize(ref colliders);
 
                 int numColliders = colliders.Length;
@@ -450,10 +449,11 @@ namespace ZG
 
         public static NativeArray<Entity> DeserializeCompoundColliders(
             this ref NativeBuffer.Reader reader,
+            ref NativeList<BlobAssetReference<Collider>> colliders, 
             Allocator allocator,
             World world)
         {
-            return world.GetOrCreateSystemManaged<System>().Deserialize(ref reader, allocator);
+            return world.GetOrCreateSystemManaged<System>().Deserialize(ref reader, ref colliders, allocator);
         }
 
         public static NativeArray<int> DeserializeDeserializers<T>(

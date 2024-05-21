@@ -68,7 +68,9 @@ namespace ZG
 
     public static class BoundingVolumeHierarchyUtility
     {
-        public static BoundingVolumeHierarchyLite CreateBoundingVolumeHierarchy(this in BroadphaseTree.Container container, Allocator allocator)
+        public static BoundingVolumeHierarchyLite CreateBoundingVolumeHierarchy(
+            this in BroadphaseTree.Container container, 
+            in AllocatorManager.AllocatorHandle allocator)
         {
             BoundingVolumeHierarchyLite result;
             var nodes = container.nodes;
@@ -82,7 +84,9 @@ namespace ZG
             return result;
         }
 
-        public static BoundingVolumeHierarchyLiteEx CreateBoundingVolumeHierarchyDynamic(this in CollisionWorldContainer container, Allocator allocator)
+        public static BoundingVolumeHierarchyLiteEx CreateBoundingVolumeHierarchyDynamic(
+            this in CollisionWorldContainer container, 
+            in AllocatorManager.AllocatorHandle allocator)
         {
             BoundingVolumeHierarchyLiteEx result;
             var dynamicBodies = container.dynamicBodies;

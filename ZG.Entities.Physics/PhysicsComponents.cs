@@ -8,7 +8,7 @@ namespace ZG
 {
     public struct PhysicsShapeCompoundCollider : IComponentData
     {
-        public BlobAssetReference<Unity.Physics.Collider> value;
+        public BlobAssetReference<Collider> value;
     }
 
     public struct PhysicsShapeParent : IComponentData
@@ -20,7 +20,7 @@ namespace ZG
     public struct PhysicsShapeCollider : IComponentData
     {
         public float contactTolerance;
-        public BlobAssetReference<Unity.Physics.Collider> value;
+        public BlobAssetReference<Collider> value;
     }
 
     public struct PhysicsShapeColliderBlobInstance : IBufferElementData
@@ -69,7 +69,7 @@ namespace ZG
     public struct PhysicsShapeDestroiedCollider : ICleanupBufferElementData
     {
         public uint hash;
-        public BlobAssetReference<Unity.Physics.Collider> value;
+        public BlobAssetReference<Collider> value;
     }
 
     public interface IPhysicsShapeComponent
