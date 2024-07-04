@@ -398,7 +398,7 @@ namespace ZG
                 assigner.Dispose();
 
                 //colliderCounts.Dispose();
-                colliders.Dispose();
+                //colliders.Dispose();
                 
                 return entityArray;
             }

@@ -48,18 +48,23 @@ namespace ZG.Entities.Physics
         [BurstCompile]
         private struct Clear : IJob
         {
-            [ReadOnly]
             public NativeArray<int> resultAndCount;
 
             public SharedList<PhysicsRaycaster.Collider>.Writer collidersToIgnore;
 
             public void Execute()
             {
+                int length = resultAndCount[1];
                 if (resultAndCount[0] == 0)
-                    return;
+                {
+                    if(length == collidersToIgnore.length)
+                        return;
+
+                    resultAndCount[0] = 1;
+                }
 
                 collidersToIgnore.Clear();
-                collidersToIgnore.capacity = math.max(collidersToIgnore.capacity, resultAndCount[1]);
+                collidersToIgnore.capacity = math.max(collidersToIgnore.capacity, length);
             }
         }
 
