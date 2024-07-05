@@ -35,17 +35,17 @@ namespace ZG
             }
         }
 
-        public static float CalaculeHorizontalFieldOfView(float vFOVRad, float aspect)
+        public static float CalculateHorizontalFieldOfView(float vFOVRad, float aspect)
         {
             return Mathf.Atan(Mathf.Tan(vFOVRad * 0.5f) * aspect) * 2.0f;
         }
 
-        private static float __CalaculeRadius(float near, float fov, float aspect)
+        private static float __CalculateRadius(float near, float fov, float aspect)
         {
             fov *= Mathf.Deg2Rad;
 
             if (aspect > 1.0f)
-                fov = CalaculeHorizontalFieldOfView(fov, aspect);
+                fov = CalculateHorizontalFieldOfView(fov, aspect);
 
             float radius = near / Mathf.Cos(fov * 0.5f);
 
@@ -56,7 +56,7 @@ namespace ZG
         {
             SphereGeometry geometry = default;
             geometry.Center = Vector3.zero;
-            geometry.Radius = __CalaculeRadius(nearClipPlane, fieldOfView, aspect);
+            geometry.Radius = __CalculateRadius(nearClipPlane, fieldOfView, aspect);
 
             if (!__collider.IsCreated)
             {
