@@ -1203,6 +1203,9 @@ namespace ZG
             {
                 UnityEngine.Profiling.Profiler.BeginSample("Build");
 
+                if (__triggers != null)
+                    __triggers.Clear();
+
                 bool isBaked = (_flag & Flag.Baked) == Flag.Baked;
                 using (var colliderBlobInstances = new NativeList<CompoundCollider.ColliderBlobInstance>(Allocator.TempJob))
                 {
@@ -1254,7 +1257,7 @@ namespace ZG
                                 tag = collider.tag;
 
                                 trigger.tag = tag == "Untagged" ? string.Empty : tag;
-
+                                
                                 trigger.childIndex = root.GetLeafIndex(collider.transform);
 
                                 if (__triggers == null)

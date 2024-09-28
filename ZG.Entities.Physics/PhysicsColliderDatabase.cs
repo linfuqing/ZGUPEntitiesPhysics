@@ -14,6 +14,7 @@ namespace ZG
 {
     public class PhysicsColliders : SharedNativeArray<CompoundCollider.ColliderBlobInstance>, IDisposable
     {
+        [Flags]
         public enum Flag
         {
             Created = 0x01,
