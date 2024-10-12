@@ -2,11 +2,12 @@
     "name": "ZG.Entities.Physics.Editor",
     "rootNamespace": "",
     "references": [
+        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:734d92eba21c94caba915361bd5ac177",
+        "GUID:a5baed0c9693541a5bd947d336ec7659",
         "GUID:63afb046c8423dd448ae7aba042ea63d",
         "GUID:e00140a815de944528348782854abe39",
-        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:beff58cf91ef5dc4f8939ec84aca2109",
         "GUID:4ef6fca698a819a45a56658a454d07b6",
         "GUID:d1080dc0d8432164aa6d65c2e12ef977",
